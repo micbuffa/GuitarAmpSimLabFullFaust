@@ -1,9 +1,42 @@
 import("stdfaust.lib");
 import("IFCdynTube.dsp");
 
+declare name      "IFCpreampGridCurrentCathodeBiasOptionnalDynStage";
+declare author    "Michel Buffa";
+declare version   "1.0";
+declare license   "LGPL";
+
+/* Ceci est un "preamp lab" permettant de construire un preamp avec de nombreuses
+   possibilités de réglages. 
+
+   Deux modèles de lampes sont proposés :
+   1 - un premier modèle "dynamique" (pentode), en trois parties distinctes:
+   une partie modélisant le courant de grille (avant la pentode)
+   une partie modélisant la pentode elle-même
+   une partie modélisant le bias de cathode
+
+   2 - un modèle "tout en un", avec des réglages théoriquement plus fins. 
+   Voir détails dans le fichier IFCdynTube.dsp.
+
+   Il est possible de choisir le nombre d'étages voulus, les paramètres des 
+   lampes, les paramètres des filtres inter étages, du grid current, du cathode bias, 
+   par étage etc. Des presets sont fournis pour un ensemble d'amplificateurs
+   à lampes emblématiques.
+
+   La UI permet de choisir soit tous les étages basés sur  le modèle 1 (menu "static"),
+   soit tous les étages avec modèle 1 mais avec le dernier étage 
+   utilisant le modèle 2 plus "dynamique".
+
+   Optionnellement, on peut activer l'anti-aliasing ADAA sur les modèles de lampes,
+   et des filtres hi-cut et lo-cut en sortie du preamp.
+
+   On peut régler le gain avant le preamp, et un gain de sortie dans la UI.
+   Un réglage du gain entre les étages 1 et 2 est également proposé dans la UI.
+*/
+
 // ------ PREAMP ----@-
 input_vol = hgroup("Preamp[stratus:0]", hslider("Input Vol[stratus:0][style:knob]", 1.0, 0.0, 3.0, 0.01)) : si.smoo;
-gain_knob = hgroup("Preamp[stratus:0]", hslider("Interstage Gain[stratus:1][style:knob]", 0.8, 0.0, 1.0, 0.01)) : si.smoo;
+gain_knob = hgroup("Preamp[stratus:0]", hslider("Interstage Gain[stratus:1][style:knob]", 0.07, 0.01, 1.0, 0.01)) : si.smoo;
 preamp_out = hgroup("Preamp[stratus:0]", hslider("Master Vol[stratus:2][style:knob]", 1.0, 0.0, 5.0, 0.01)) : si.smoo;
 gk = gain_knob;
 
@@ -99,7 +132,7 @@ gc1_amtIn_ui   = hgroup("Preamp/Grid Current Stage1", hslider("Input Push[stratu
 gc1_amtBias_ui = hgroup("Preamp/Grid Current Stage1", hslider("Bias Push[stratus:3][style:knob]",   0.05, 0.0,  1.0,  0.01)) : si.smoo;
 gc1_tau_ui     = hgroup("Preamp/Grid Current Stage1", hslider("Recovery ms[stratus:4][style:knob]", 80.0, 5.0, 500.0, 1.0))  : si.smoo;
 
-//                           Custom        Marshall Fender  Mesa   Vox   Peavey Deluxe Soldano Orange
+//              Custom        Marshall    Fender    Mesa   Vox  Peavey  Deluxe Soldano Orange
 grid1_enable  = (gc1_enable_ui,  0,         0,      1,      0,     1,    0,     0,     1)     : ba.selectn(9, gc_preset) : si.smoo;
 grid1_vth     = (gc1_vth_ui,     0.5,       0.80,   0.40,   0.60,  0.35, 0.7,   0.45,  0.45)  : ba.selectn(9, gc_preset) : si.smoo;
 grid1_amtIn   = (gc1_amtIn_ui,   0.10,      0.02,   0.15,   0.08,  0.20, 0.05,  0.15,  0.12)  : ba.selectn(9, gc_preset) : si.smoo;
@@ -117,7 +150,7 @@ gc2_amtIn_ui   = hgroup("Preamp/Grid Current Stage2", hslider("Input Push[stratu
 gc2_amtBias_ui = hgroup("Preamp/Grid Current Stage2", hslider("Bias Push[stratus:3][style:knob]",   0.05, 0.0,  1.0,  0.01)) : si.smoo;
 gc2_tau_ui     = hgroup("Preamp/Grid Current Stage2", hslider("Recovery ms[stratus:4][style:knob]", 80.0, 5.0, 500.0, 1.0))  : si.smoo;
 
-//                           Custom        Marshall Fender  Mesa   Vox   Peavey Deluxe Soldano Orange
+//               Custom        Marshall   Fender  Mesa     Vox  Peavey  Deluxe Soldano Orange
 grid2_enable  = (gc2_enable_ui,  1,         0,      1,      1,     1,    0,     1,     1)     : ba.selectn(9, gc_preset) : si.smoo;
 grid2_vth     = (gc2_vth_ui,     0.4,       0.80,   0.30,   0.50,  0.25, 0.7,   0.35,  0.35)  : ba.selectn(9, gc_preset) : si.smoo;
 grid2_amtIn   = (gc2_amtIn_ui,   0.20,      0.02,   0.40,   0.15,  0.50, 0.05,  0.35,  0.25)  : ba.selectn(9, gc_preset) : si.smoo;
@@ -135,7 +168,7 @@ gc3_amtIn_ui   = hgroup("Preamp/Grid Current Stage3", hslider("Input Push[stratu
 gc3_amtBias_ui = hgroup("Preamp/Grid Current Stage3", hslider("Bias Push[stratus:3][style:knob]",   0.05, 0.0,  1.0,  0.01)) : si.smoo;
 gc3_tau_ui     = hgroup("Preamp/Grid Current Stage3", hslider("Recovery ms[stratus:4][style:knob]", 80.0, 5.0, 500.0, 1.0))  : si.smoo;
 
-//                           Custom        Marshall Fender  Mesa   Vox   Peavey Deluxe Soldano Orange
+//               Custom        Marshall   Fender   Mesa    Vox  Peavey Deluxe Soldano Orange
 grid3_enable  = (gc3_enable_ui,  1,         0,      1,      0,     1,    0,     1,     1)     : ba.selectn(9, gc_preset) : si.smoo;
 grid3_vth     = (gc3_vth_ui,     0.35,      0.80,   0.25,   0.50,  0.20, 0.7,   0.30,  0.30)  : ba.selectn(9, gc_preset) : si.smoo;
 grid3_amtIn   = (gc3_amtIn_ui,   0.30,      0.02,   0.50,   0.15,  0.60, 0.05,  0.45,  0.35)  : ba.selectn(9, gc_preset) : si.smoo;
@@ -193,7 +226,7 @@ cath1_en_ui    = hgroup("Preamp/Cathode Bias Stage 1", checkbox("Enable[stratus:
 cath1_tau_ui   = hgroup("Preamp/Cathode Bias Stage 1", hslider("RC Time (ms)[stratus:1]", 40.0,  5.0, 300.0, 1.0)) : si.smoo;
 cath1_scale_ui = hgroup("Preamp/Cathode Bias Stage 1", hslider("Shift Factor[stratus:2]",  0.08,  0.0,   0.5, 0.01)) : si.smoo;
 
-//                           Custom       Marshall  Fender  Mesa  Vox   Peavey  Deluxe Soldano Orange
+//             Custom       Marshall     Fender    Mesa   Vox   Peavey  Deluxe Soldano Orange
 cath1_en    = (cath1_en_ui,    1,           1,       1,     1,    1,     1,     1,     1)   : ba.selectn(9, cath_preset);
 cath1_tau   = (cath1_tau_ui,  68.0,        40.0,    20.0,  60.0, 15.0,  40.0,  50.0,  60.0): ba.selectn(9, cath_preset) : si.smoo;
 cath1_scale = (cath1_scale_ui, 0.12,        0.08,    0.15,  0.18, 0.20,  0.08,  0.12,  0.12): ba.selectn(9, cath_preset) : si.smoo;
@@ -206,7 +239,7 @@ cath2_en_ui    = hgroup("Preamp/Cathode Bias Stage 2", checkbox("Enable[stratus:
 cath2_tau_ui   = hgroup("Preamp/Cathode Bias Stage 2", hslider("RC Time (ms)[stratus:1]", 25.0,  5.0, 300.0, 1.0)) : si.smoo;
 cath2_scale_ui = hgroup("Preamp/Cathode Bias Stage 2", hslider("Shift Factor[stratus:2]",  0.10,  0.0,   0.5, 0.01)) : si.smoo;
 
-//                           Custom       Marshall  Fender  Mesa  Vox   Peavey  Deluxe Soldano Orange
+//             Custom       Marshall      Fender  Mesa    Vox   Peavey  Deluxe Soldano Orange
 cath2_en    = (cath2_en_ui,    1,           1,       1,     1,    1,     1,     1,     1)   : ba.selectn(9, cath_preset);
 cath2_tau   = (cath2_tau_ui,  38.0,        25.0,    15.0,  60.0, 10.0,  25.0,  30.0,  35.0): ba.selectn(9, cath_preset) : si.smoo;
 cath2_scale = (cath2_scale_ui, 0.18,        0.08,    0.22,  0.22, 0.30,  0.10,  0.20,  0.20): ba.selectn(9, cath_preset) : si.smoo;
@@ -220,7 +253,7 @@ cath3_en_ui    = hgroup("Preamp/Cathode Bias Stage 3", checkbox("Enable[stratus:
 cath3_tau_ui   = hgroup("Preamp/Cathode Bias Stage 3", hslider("RC Time (ms)[stratus:1]", 25.0,  5.0, 300.0, 1.0)) : si.smoo;
 cath3_scale_ui = hgroup("Preamp/Cathode Bias Stage 3", hslider("Shift Factor[stratus:2]",  0.08,  0.0,   0.5, 0.01)) : si.smoo;
 
-//                           Custom       Marshall  Fender  Mesa  Vox   Peavey  Deluxe Soldano Orange
+//             Custom       Marshall     Fender     Mesa   Vox Peavey  Deluxe Soldano Orange
 cath3_en    = (cath3_en_ui,    1,           0,       1,     1,    1,     0,     1,     1)   : ba.selectn(9, cath_preset);
 cath3_tau   = (cath3_tau_ui,  20.0,        25.0,    12.0,  50.0,  8.0,  25.0,  20.0,  25.0): ba.selectn(9, cath_preset) : si.smoo;
 cath3_scale = (cath3_scale_ui, 0.22,        0.06,    0.28,  0.18, 0.38,  0.08,  0.25,  0.25): ba.selectn(9, cath_preset) : si.smoo;
@@ -308,15 +341,15 @@ triode_b3_ui = hgroup("Preamp/Triode Characteristics", hslider("V3 Bias (b)[stra
 //  │ a3=5   b3=-0.12  Son "organique"                                           │
 //  └─────────────────────────────────────────────────────────────────────────────┘
 //
-// Routing par ba.selectn
-// Indices:  0=Custom,   1=Marshall, 2=Fender, 3=Mesa, 4=Vox,  5=Peavey, 6=Deluxe, 7=Soldano, 8=Orange
-triode_a1 = (triode_a1_ui,  6.0,   3.0,   8.0,  6.0,  9.0,  4.5,  9.0,  7.0) : ba.selectn(9, triode_preset) : si.smoo;
+// Routing via ba.selectn
+// Index:  0=Custom,   1=Marshall, 2=Fender, 3=Mesa, 4=Vox,  5=Peavey, 6=Deluxe, 7=Soldano, 8=Orange
+triode_a1 = (triode_a1_ui,  6.0,   3.0,   8.0,  6.0,   9.0,    4.5,   9.0,   7.0)  : ba.selectn(9, triode_preset) : si.smoo;
 triode_b1 = (triode_b1_ui, -0.12, -0.04, -0.10, -0.08, -0.14, -0.08, -0.12, -0.10) : ba.selectn(9, triode_preset) : si.smoo;
 
-triode_a2 = (triode_a2_ui,  5.0,   1.5,   8.0,  4.5, 10.0,  2.5,  8.0,  6.0) : ba.selectn(9, triode_preset) : si.smoo;
+triode_a2 = (triode_a2_ui,  5.0,   1.5,   8.0,  4.5,   10.0,  2.5,   8.0,   6.0)   : ba.selectn(9, triode_preset) : si.smoo;
 triode_b2 = (triode_b2_ui, -0.16, -0.06, -0.30, -0.07, -0.24, -0.10, -0.22, -0.14) : ba.selectn(9, triode_preset) : si.smoo;
 
-triode_a3 = (triode_a3_ui,  3.5,   2.0,   6.0,  3.5,  8.0,  3.0,  6.0,  5.0) : ba.selectn(9, triode_preset) : si.smoo;
+triode_a3 = (triode_a3_ui,  3.5,   2.0,   6.0,  3.5,    8.0,   3.0,   6.0,   5.0)  : ba.selectn(9, triode_preset) : si.smoo;
 triode_b3 = (triode_b3_ui, -0.15, -0.06, -0.20, -0.06, -0.18, -0.10, -0.18, -0.12) : ba.selectn(9, triode_preset) : si.smoo;
 
 
@@ -480,9 +513,9 @@ safeDrive = max(0.05, dyn_drive0_eff);
 // Grid current actif (via bGc_in) → les notes tenues fortes font "s'étrangler" légèrement le son (blocking distortion) 
 //                                 → très réaliste sur les palm mutes forts
 // ------------------------------------------
-// 2 - Modème dynamique
+// 2 - Modèle dynamique
 // ------------------------------------------
-// 
+// Ne marche pas encore correctement, plusieurs éléments encore à ajuster (gains, scale etc.)
 
 
 stage1_with_gc_v2 = 
@@ -606,6 +639,30 @@ preamp_stages_ui = hgroup(
 preamp_stages = (preamp_stages_ui, 2,       1,       2,    1,    2,     1,      2,     2) : ba.selectn(9, amp_preset);
 
 
+// =============================================================================
+// Per-preset output level compensation
+// =============================================================================
+// Each amp model produces very different output levels due to varying drive
+// values and number of stages. This table normalises the output so all presets
+// have approximately the same perceived loudness with neutral input_vol=1,
+// interstage gain=0.8 (default) and master=1.
+//
+// Reasoning (with input_vol=1, gk=0.8, preamp_out=1):
+//   - tanh(a*x) output ≈ a*x when x is small (linear region)
+//   - tanh saturates at ±1 for large |a*x|
+//   - Clean amps (Fender Twin: a1=3, a2=1.5, 2 stages) produce low RMS
+//   - Hi-gain amps (Peavey: a1=9…a3=8, 3 stages) sit at tanh≈±1 → high RMS
+//   - Compensation = inverse of typical RMS at unity settings
+//
+// Values: >1 = boost (clean amps need more level)
+//         <1 = cut   (hi-gain amps are already loud)
+//         1  = neutral (Custom mode, user controls everything)
+//
+//                   Custom  Marshall  Fender  Mesa   Vox    Peavey  Deluxe  Soldano  Orange
+preamp_level_comp = (1.0,    0.7,      1.8,    0.5,   0.9,   0.4,    1.4,    0.55,    0.65)
+                  : ba.selectn(9, amp_preset) : si.smoo;
+
+
 // amp_preset drives this — when 0 (Custom), the UI sliders below are used
 filter_preset = amp_preset;
 
@@ -614,7 +671,7 @@ lp12_ui = hgroup("Preamp/Interstage Filters", hslider("LPF 1-2 (Hz)[stratus:2]",
 hp23_ui = hgroup("Preamp/Interstage Filters", hslider("HPF 2-3 (Hz)[stratus:3]",  20.0,   5.0,  500.0,  1.0)) : si.smoo;
 lp23_ui = hgroup("Preamp/Interstage Filters", hslider("LPF 2-3 (Hz)[stratus:4]",  8000.0, 2000.0, 18000.0, 10.0)) : si.smoo;
 
-// Indices:      0        1         2        3        4        5        6        7        8
+// Index: 0        1         2        3        4        5        6        7        8
 hp12 = (hp12_ui, 60.0,    30.0,     10.0,    150.0,   120.0,   15.0,    80.0,    30.0)    : ba.selectn(9, filter_preset) : si.smoo;
 lp12 = (lp12_ui, 9418.0,  12000.0,  8000.0,  15000.0, 9000.0,  10000.0, 8500.0,  6500.0)  : ba.selectn(9, filter_preset) : si.smoo;
 hp23 = (hp23_ui, 79.0,    15.0,     5.0,     40.0,    180.0,   20.0,    100.0,   20.0)    : ba.selectn(9, filter_preset) : si.smoo;
@@ -625,7 +682,7 @@ interStage23 = fi.highpass(1, hp23)  : fi.lowpass(1, lp23);
 interstage_dc = fi.dcblocker;
 
 preAmp1 = *(input_vol) : stage1_with_gc_v2
-        : interstage_dc : *(preamp_out);
+        : interstage_dc : *(preamp_out * preamp_level_comp);
 
 preAmp2 = *(input_vol) : stage1_with_gc_v2
         : interstage_dc
@@ -633,7 +690,7 @@ preAmp2 = *(input_vol) : stage1_with_gc_v2
         : interStage12
         : stage2_with_gc_v2
         : interstage_dc
-        : *(preamp_out);
+        : *(preamp_out * preamp_level_comp);
 
 preAmp3 = *(input_vol) : stage1_with_gc_v2
         : interstage_dc
@@ -644,10 +701,10 @@ preAmp3 = *(input_vol) : stage1_with_gc_v2
         : interStage23
         : stage3_with_gc_v2
         : interstage_dc
-        : *(preamp_out);
+        : *(preamp_out * preamp_level_comp);
 
 // -----------------------------------------------------------------------------
-// Post-Preamp Sculpting EQ (Fred Miniere cuts)
+// Post-Preamp Sculpting EQ (hi and lo cuts)
 // -----------------------------------------------------------------------------
 hc_en = hgroup("Post-Preamp Sculpting EQ[stratus:1]", checkbox("Enable High Cut[stratus:0]"));
 lc_en = hgroup("Post-Preamp Sculpting EQ[stratus:1]", checkbox("Enable Low Cut[stratus:4]"));

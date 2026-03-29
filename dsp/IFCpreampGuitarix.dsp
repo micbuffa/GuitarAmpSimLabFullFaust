@@ -4,10 +4,10 @@ import("IFCguitarixTubes.dsp");
 preampMB = *(inputVolume)
     : chain
     : *(gain)
-with {
+with { 
     inputVolume = hgroup("Preamp Guitarix", hslider("Input Volume[style:knob]",-6,-20,20,0.1) : ba.db2linear : si.smooth(0.999));
     preamp = hgroup("Preamp Guitarix", hslider("Interstage gain[style:knob]",-6,-20,20,0.1) : ba.db2linear : si.smooth(0.999));
-    gain  = hgroup("Preamp Guitarix", hslider("Output gain[style:knob]", -6, -20.0, 20.0, 0.1) : ba.db2linear : si.smooth(0.999));
+    gain  = hgroup("Preamp Guitarix", hslider("Output gain[style:knob]", 7, -20.0, 20.0, 0.1) : ba.db2linear : si.smooth(0.999));
 
     nstages = hgroup("Preamp Guitarix", nentry("Nb Stages[style:menu{'1 stage':0;'2 stages':1;'3 stages':2}]", 2, 0, 2, 1));
 
@@ -51,4 +51,9 @@ with {
     chain = (nstages, (_ <: chain1, chain2, chain3)) : ba.selectn(3);
 };
 
-process = preampMB;
+preampMono = hgroup("Preamp Guitarix", ba.bypass_fade(ma.SR/10, checkbox("bypass"), preampMB));
+
+preAmp = preampMono;
+//process = preAmp;
+
+ 

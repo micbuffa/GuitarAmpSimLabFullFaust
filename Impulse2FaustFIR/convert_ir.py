@@ -17,7 +17,7 @@ def convert():
         files = sys.argv[1:]
 
     if not files:
-        print("❌ Error : No WAV file provided.")
+        print("❌ Erreur : Aucun fichier WAV fourni.")
         return
 
     fir_definitions = []
@@ -48,29 +48,29 @@ def convert():
             coeffs_str = ", ".join([f"{v:.8f}" for v in coeffs])
             base_name = os.path.splitext(os.path.basename(wav_path))[0]
             
-            # Storage of the definitions
+            # Stockage des définitions
             fir_definitions.append(f"fir_{idx} = fi.fir(({coeffs_str})); // {base_name}")
             fir_names.append(f"fir_{idx}")
             cab_names.append(base_name)
-            print(f"✅ IR processed : {base_name}")
+            print(f"✅ IR traitée : {base_name}")
 
         except Exception as e:
-            print(f"❌ Error on {wav_path} : {e}")
+            print(f"❌ Erreur sur {wav_path} : {e}")
 
-    # Preparation of the strings for the FAUST template
+    # Préparation des chaînes pour le template FAUST
     all_firs = "\n".join(fir_definitions)
     selector_list = ", ".join(fir_names)
     fir_gains_str = ", ".join(fir_gains)
     num_cabs = len(fir_names)
 
-    # Drop down menu
+    # Création du menu déroulant
     safe_names = [name.replace("'", "") for name in cab_names]
     menu_items = ";".join([f"'{name}':{i}" for i, name in enumerate(safe_names)])
     menu_style = f"[style:menu{{{menu_items}}}]"
 
     faust_template = f"""import("stdfaust.lib");
 
-// --- IMPULSE BANK ---
+// --- BANQUE D'IMPULSIONS ---
 {all_firs}
 
 // --- INTERFACE ---
@@ -79,14 +79,14 @@ selected_cab = hgroup("Cabinet Simulator", nentry("Cabinet Select[stratus:1]{men
 mix = hgroup("Cabinet Simulator", hslider("Mix (Dry/Wet)[stratus:2]", 1, 0, 1, 0.01)) : si.smoo;
 gain = hgroup("Cabinet Simulator", hslider("Output (dB)[stratus:3]", 0, -20, 10, 0.1)) : ba.db2linear : si.smoo;
 
-// --- ROUTING ---
-// Send the input to all FIR, and select the output signal
+// --- ROUTAGE ---
+// L'entrée est dirigée UNIQUEMENT vers le FIR sélectionné (exécution à la demande)
 cab_gain = {fir_gains_str} : ba.selectn({num_cabs}, selected_cab);
 
 cab_process = _ <: (dry, wet) : + : *(gain)
 with {{
     dry = *(1 - mix);
-    wet = _ <: ({selector_list}) : ba.selectn({num_cabs}, selected_cab) : *(mix);
+    wet = _ : ba.selectoutn({num_cabs}, selected_cab) : ({selector_list}) :> *(mix);
 }};
 
 bypassed_process = _ * cab_gain;
@@ -97,7 +97,7 @@ process = _ <: select2(bypass, cab_process, bypassed_process);
     with open("MultiCab_Sim.dsp", "w") as f:
         f.write(faust_template)
     
-    print(f"\n🚀 Finished ! 'MultiCab_Sim.dsp' generated with {num_cabs} cabs.")
+    print(f"\n🚀 Terminé ! 'MultiCab_Sim.dsp' généré avec {num_cabs} baffles.")
 
 if __name__ == "__main__":
     convert()

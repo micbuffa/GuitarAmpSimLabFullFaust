@@ -96,6 +96,16 @@ model  = hgroup("Tonestack", hgroup("tonestack type",
            nentry("Model[style:menu{'Mesa Boogie':0;'JCM800':1;'AC30':2;'Fender Hot Rod':3}]",
                   0, 0, 3, 1))) : int;
 
+// ---- per-model makeup gain to compensate passive attenuation ----------------
+// Passive tonestacks inherently lose signal (typically -15 to -25 dB depending
+// on component values and knob settings). These makeup gains bring each model
+// back to approximately unity gain at "noon" settings (bass=0.5, mid=0.3, treble=0.75).
+// Values are in linear gain (dB equivalent shown in comments).
+//                                Mesa     JCM800   AC30     Fender Deville
+//                                ~+20dB   ~+18dB   ~+22dB   ~+16dB
+makeupGainTable = 10.0, 8.0, 12.5, 6.3;
+makeupGain = makeupGainTable : ba.selectn(NMODELS, model);
+
 // ---- model selector using ba.selectn ---------------------------------------
 // ba.selectn(N, k) : (sig0, sig1, ..., sigN-1) -> sig_k
 selectedModel =
@@ -104,7 +114,8 @@ selectedModel =
         jcm800(treble, middle, bass),
         ac30(treble, middle, bass),
         fender_deville(treble, middle, bass)
-    : ba.selectn(NMODELS, model);
+    : ba.selectn(NMODELS, model)
+    : *(makeupGain);
 
 // ---- process ---------------------------------------------------------------
 selectedModel1 = hgroup("Tonestack[stratus:3]", ba.bypass_fade(ma.SR/10, checkbox("bypass"), selectedModel));

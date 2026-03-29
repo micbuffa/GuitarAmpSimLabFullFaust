@@ -24,7 +24,7 @@ declare category "Amp";
 // different guitar amps, ADAA anti-aliasing, etc.
 
 // Output gain at the end of the chain, before the cabinet simulation just an output volume
-outputLevel = hgroup("Output[stratus:4]", hslider("Level[style:knob]", 0.5, 0.0, 1.0, 0.01)) : si.smoo;
+outputLevel = hgroup("Output[stratus:4]", hslider("Level[style:knob]", 1, 0.0, 1.0, 0.01)) : si.smoo;
 output_gain = ba.db2linear((outputLevel - 0.5) * 24 + (-30.00));  // norm: -30.0dB
 
 // ── Process chain ───────────────────────────────────────
@@ -83,7 +83,7 @@ monoChain =
         : fi.dcblocker
         : *(output_gain)
         : reverbMulti
-        :> cabSimMB:>_;
+        :> cabSim:>_;
 
 
 process = monoChain <: _, _;
