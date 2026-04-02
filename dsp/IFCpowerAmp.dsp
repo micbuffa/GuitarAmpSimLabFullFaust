@@ -100,11 +100,11 @@ main = *(masterVolume) :(+ : waveshaper : fi.dcblocker) ~ feedbackCircuit : gain
 	// occurs from the prefilter and modulation step. Then we apply the output
 	// level parameter.
 	gain = *(4.0) : *(plevel);
-	masterVolume = hslider("Master Volume[name:MV][style:knob]", 1, 0, 4, 0.1)  : si.smoo;
+	masterVolume = hslider("Master Volume[name:MV][style:knob]", 2.3, 0, 4, 0.1)  : si.smoo;
 };
 
 // Export reusable mono and stereo variants for composition in larger patches.
-powerampMono = hgroup("PowerAmp FAUST / WebAudio", ba.bypass_fade(ma.SR/10, checkbox("bypass"), main));
+powerampMono = hgroup("5 Power Amp", ba.bypass_fade(ma.SR/10, checkbox("bypass"), main));
 powerampStereo = powerampMono, powerampMono;
 
 powerAmp_stage = powerampMono;

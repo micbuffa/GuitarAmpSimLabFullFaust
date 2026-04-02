@@ -86,15 +86,15 @@ fender_deville(T,M_,L)= tonestack(250:pF,100:nF, 22:nF, 250:k, 250:k, 25:k, 130:
 NMODELS = 4;
 
 // ---- UI controls -----------------------------------------------------------
-// vgroup "Tonestack"
+// vgroup "4 Tonestack"
 //   hgroup "EQ"  : 3 knobs  (Bass | Middle | Treble)
 //   hgroup "Type": label + menu selector
-bass   = hgroup("Tonestack", hgroup("EQ", vslider("Bass[1][style:knob]",   0.5, 0, 1, 0.01)));
-middle = hgroup("Tonestack", hgroup("EQ", vslider("Middle[2][style:knob]", 0.3, 0, 1, 0.01)));
-treble = hgroup("Tonestack", hgroup("EQ", vslider("Treble[3][style:knob]", 0.75, 0, 1, 0.01)));
-model  = hgroup("Tonestack", hgroup("tonestack type",
+bass   = hgroup("4 Tonestack", hgroup("EQ", vslider("Bass[1][style:knob]",   0.5, 0, 1, 0.01)));
+middle = hgroup("4 Tonestack", hgroup("EQ", vslider("Middle[2][style:knob]", 0.3, 0, 1, 0.01)));
+treble = hgroup("4 Tonestack", hgroup("EQ", vslider("Treble[3][style:knob]", 0.75, 0, 1, 0.01)));
+model  = hgroup("4 Tonestack", hgroup("tonestack type",
            nentry("Model[style:menu{'Mesa Boogie':0;'JCM800':1;'AC30':2;'Fender Hot Rod':3}]",
-                  0, 0, 3, 1))) : int;
+                  3, 0, 3, 1))) : int;
 
 // ---- per-model makeup gain to compensate passive attenuation ----------------
 // Passive tonestacks inherently lose signal (typically -15 to -25 dB depending
@@ -118,7 +118,7 @@ selectedModel =
     : *(makeupGain);
 
 // ---- process ---------------------------------------------------------------
-selectedModel1 = hgroup("Tonestack[stratus:3]", ba.bypass_fade(ma.SR/10, checkbox("bypass"), selectedModel));
+selectedModel1 = hgroup("4 Tonestack", ba.bypass_fade(ma.SR/10, checkbox("bypass"), selectedModel));
 
 tonestack_stage = selectedModel1;
 

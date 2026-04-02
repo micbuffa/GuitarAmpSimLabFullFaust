@@ -16,10 +16,10 @@ declare license   "LGPL";
 // ------------------------------------------------------------
 // UI finale
 // ------------------------------------------------------------
-mixReverb = hslider("Reverb/Mix [style:knob]", 0.18, 0.0, 1.0, 0.001) : si.smoo;
+mixReverb = hgroup("6 Reverb", hslider("Mix [style:knob]", 0.597, 0.0, 1.0, 0.001)) : si.smoo;
 
 // Menu : 0 = Freeverb, 1 = Spring, 2 = Zita
-algo = int(nentry("Reverb/Type [style:menu{'Freeverb':0;'Spring':1;'Zita':2}]", 2, 0, 2, 1));
+algo = int(hgroup("6 Reverb", nentry("Type [style:menu{'Freeverb':0;'Spring':1;'Zita':2}]", 1, 0, 2, 1)));
 
 // ------------------------------------------------------------
 // Defaults "guitare"

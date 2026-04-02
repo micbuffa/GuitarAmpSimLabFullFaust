@@ -34,7 +34,7 @@ with {
 };
 
 // ADAA Oversampling feature
-os_enable_dyn = hgroup("Preamp[stratus:0]", checkbox("Oversampling ADAA[stratus:3]")) : int;
+os_enable_dyn = hgroup("2 Preamp", checkbox("Oversampling MODEL 2[stratus:3]")) : int;
 
 logcosh(x) = abs(x) - 0.69314718056 + log(1.0 + exp(-2.0 * abs(x)));
 
