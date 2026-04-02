@@ -1,0 +1,32 @@
+3.1 Static Triode Nonlinearity
+3.1.1 Physical Motivation and Mathematical Model
+The fundamental building block of our vacuum tube simulation is the static nonlinearity that replicates the transfer characteristic of a triode amplifier stage. In a physical triode circuit, the relationship between the grid voltage ($V_g$) and the plate current ($I_p$) is governed by Child-Langmuir law and the specific load line of the circuit. For real-time digital implementation, we adopt a computationally efficient sigmoidal approximation based on the hyperbolic tangent function:
+
+$$ y[n] = \tanh\bigl(a \cdot x[n] + b\bigr) \tag{10} $$
+
+where $x[n]$ is the normalized input signal, $a$ is the drive (or slope) parameter, and $b$ is the bias (or operating point) offset. This model effectively captures the "soft-clipping" behavior of tube saturation, where the gain decreases smoothly as the signal approaches the supply rails (modeled by the $\pm 1$ horizontal asymptotes of the $\tanh$ function).
+
+3.1.2 Parameter Mapping
+The two primary parameters, $a$ and $b$, map directly to the tonal characteristics of the stage:
+
+Drive ($a$): Governing the slope of the transfer function in the linear region, $a$ controls the gain and the "hardness" of the saturation. Low values (e.g., $a \approx 1{-}3$) represent clean stages with high headroom, while high values (e.g., $a > 8$) yield early and aggressive saturation typical of high-gain leads.
+Bias ($b$): This parameter shifts the operating point of the stage. A zero bias ($b = 0$) results in a point-symmetric transfer function, whereas a non-zero bias ($b \neq 0$) introduces asymmetry. This shift simulates the quiescent grid voltage established by the cathode resistor or external bias supply.
+
+3.1.3 Symmetry and Harmonic Content
+The choice of $b$ is critical for the harmonic footprint of the amplifier. As demonstrated in Figure 3, a symmetrical stage ($b=0$) generates predominantly odd-order harmonics (H3, H5, H7...), resulting in a "hollow" or "square-like" distortion characteristic. In contrast, introducing a bias offset ($b \neq 0$) breaks the odd symmetry, generating a rich spectrum of even-order harmonics (H2, H4, H6...). In guitar amplification, the presence of H2 is widely regarded as a primary source of musical "warmth" and "thickness," making the precise calibration of $b$ essential for authentic modeling of vintage circuits.
+
+3.1.4 Real-time Anti-Aliasing (ADAA1)
+Nonlinear functions like $\tanh$ generate high-frequency harmonics that can exceed the Nyquist frequency ($f_s/2$), leading to inharmonic aliasing distortion. To mitigate this without the CPU cost of conventional oversampling, we implement the First-order Antiderivative Anti-Aliasing (ADAA1) technique.
+
+In this approach, the $\tanh$ function is replaced by its discrete-time antiderivative average:
+$$ y[n] = \frac{f_{ad}(a \cdot x[n] + b) - f_{ad}(a \cdot x[n-1] + b)}{(a \cdot x[n] + b) - (a \cdot x[n-1] + b)} \tag{11} $$
+where $f_{ad}(u) = \ln(\cosh(u))$ is the antiderivative of $\tanh(u)$. Mathematically, this acts as a low-pass filter integrated into the nonlinearity itself, significantly suppressing aliased components as shown in Figure 4. For signals with very small changes between samples, the model automatically reverts to the standard $\tanh$ to ensure numerical stability.
+
+3.1.5 Figure Descriptions and Interpretation
+Figure 1 — Transfer Function Characteristics. Panel (a) shows how the drive parameter $a$ affects the saturation onset; higher $a$ leads to a more compressed and saturated response for the same input level. Panel (b) illustrates the role of the bias $b$; the horizontal shift in the curve causes positive and negative signal peaks to be clipped at different levels, establishing the stage's asymmetry.
+
+Figure 2 — Waveform Deformation. This time-domain view compares symmetrical and asymmetrical clipping. In panel (a), the $b=-0.25$ curve exhibits the characteristic "warm" asymmetric rounding on one side of the waveform. Panel (b) shows how the saturation envelope progressively closes as the drive $a$ is increased from low to high-gain settings.
+
+Figure 3 — Harmonic Content comparison. The frequency-domain analysis validates the symmetry discussion. The symmetrical case (left) shows the expected odd-harmonic dominance. The asymmetrical case (right) reveals the prominent emergence of the second harmonic (H2), which is nearly equal in amplitude to the fundamental and H3, providing the desired "tube character."
+
+Figure 4 — Aliasing Suppression via ADAA1. This figure highlights the benefit of the ADAA1 implementation when processing high-frequency signals. The gray plot (standard $\tanh$) shows numerous "alien" mirrored frequencies (aliasing) caused by high-order harmonics folding back into the audible spectrum. The green plot (ADAA1) shows a much cleaner floor with significant suppression of these inharmonic artifacts, ensuring transparency even at high gain settings and standard sample rates.

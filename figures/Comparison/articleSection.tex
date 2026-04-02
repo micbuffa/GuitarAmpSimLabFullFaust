@@ -1,0 +1,22 @@
+3.5 Comparison of Modeling Strategies
+3.5.1 Structural Differences: Phenomenological vs. Gray-Box
+Our framework implements two distinct philosophies for capturing triode dynamics. Model 1 (Section 3.2-3.3) uses a phenomenologically coupled approach, where independent low-level models for grid current and cathode bias are combined additively. Model 2 (Section 3.4) adopts a unified gray-box approach, where a single modulated nonlinearity mimics the aggregate effects of these parasitics using performance-based envelopes.
+
+While Model 1 is physically inspired—each sub-block representing a specific circuit component ($R_k C_k$ or the grid-cathode diode)—Model 2 is structurally simpler. It replaces the complex signal-path filtering of Model 1 with direct modulation of the $a$ and $b$ parameters. Despite these different mathematical foundations, both models aim to reproduce the same psychoacoustic phenomena: sag, compression, and dynamic harmonic bloom.
+
+3.5.2 Behavioral Convergence and Calibration
+As demonstrated in Figure 1, both models can be calibrated to yield nearly identical envelope responses. In Model 1, the sag is an emergent property of the cathode capacitor's charge accumulation. In Model 2, the same gain reduction is explicitly commanded by the slow envelope follower $e_S$ through the coefficient $k_S$. Panel (a) shows that the output RMS trajectories are virtually indistinguishable when $k_S$ and $\tau_S$ are properly mapped to the $R_k C_k$ time constants of Model 1.
+
+The spectral evolution is compared in Figure 2. Both models successfully move the operating point over time, causing the second harmonic (H2) to "bloom" as a note sustains. Model 1 achieves this through the DC offset accumulation at the input of the $\tanh$ stage, while Model 2 modulates the $b$ parameter directly via $k_B$. The overlap in the H2 amplitude traces verifies that the cheaper gray-box modulation is a perceptually valid proxy for the more complex coupled parasitic model.
+
+3.5.3 Transient Handling and Computational Cost
+Figure 3 captures the response to complex, high-transient inputs. Model 1 exhibits realistic "blocking distortion" during heavy pick attacks due to the grid current's rectification and subsequent DC shift. Model 2 replicates this "feel" using the fast touch-sensitivity parameter $k_F$, which momentarily increases the drive during transients. Although Model 1 provides a more physically accurate representation of the signal deformation during the recovery phase, Model 2 offers a more intuitive control set for the user (Attack vs. Sag sliders).
+
+From a computational perspective, both models maintain $\mathcal{O}(1)$ complexity per sample. However, Model 2 is slightly more efficient as it bypasses the multiple smoothed-rectification stages required by Model 1, requiring only two envelope followers and a single nonlinear evaluation. This makes Model 2 particularly suitable for extremely dense multi-stage simulations or mobile/web environments where CPU headroom is critical.
+
+3.5.4 Interpretation of Figures
+Figure 1 — Envelope Sag Comparison. This figure proves the equivalence of the transient gain reduction across models. The RMS envelope of the Dynamic Gray-box model accurately tracks the phenomenological Coupled model, confirming that the "sag" coefficient $k_S$ effectively captures power supply and cathode dynamics.
+
+Figure 2 — Dynamic Harmonic Evolution. By tracking H2 and H3 over time, this analysis shows that both modeling strategies converge on the same spectral result. The growth of the even harmonic (H2) is the primary driver of "bloom" in both cases, validating the use of dynamic bias modulation in Model 2.
+
+Figure 3 — Transient Response. This comparison focuses on "touch sensitivity." Model 1 reacts to the grid-current diode's nonlinear threshold, while Model 2 uses a fast envelope to boost drive during pick transients. The visual similarity in the distorted output envelopes confirms that Model 2 reproduces the "dynamic feel" required by professional musicians.

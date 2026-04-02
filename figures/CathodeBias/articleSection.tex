@@ -1,0 +1,46 @@
+3.3 Cathode Bias Modeling
+3.3.1 Physical Background
+In a typical self-biased triode stage, a cathode resistor $R_k$ is placed between the cathode and ground to establish the quiescent operating point. To prevent negative feedback from reducing the stage's AC gain, a large bypass capacitor $C_k$ is placed in parallel with $R_k$. However, this capacitor is not a perfect short circuit to all AC signals.
+
+When the tube amplifies a large signal, the asymmetrical nature of the tube's transfer function (or grid conduction on positive peaks) causes the average cathode current to increase. This increased current pumps charge into the bypass capacitor $C_k$. Because the $R_k C_k$ network has a finite time constant (typically 10 to 100 ms), the average cathode voltage $V_k$ slowly rises during a sustained loud note and recovers slowly when the note stops.
+
+Since the grid-to-cathode voltage is $V_{gk} = V_g - V_k$, an increase in $V_k$ makes the grid relatively more negative. This dynamic shift in the operating point has two major sonic consequences:
+
+Dynamic Gain Reduction (Sag): As the operating point shifts into the colder, less conductive region of the triode's characteristic curve, the stage's gain decreases. This introduces a natural, musically pleasing compression known as "sag."
+Harmonic Modulation: The shift in bias alters the asymmetry of the transfer function, modifying the harmonic content (particularly enhancing even harmonics) in real-time as the note evolves.
+3.3.2 Proposed Mathematical Model
+To capture the "sag" and dynamic feel of cathode biasing without resorting to computationally expensive iterative circuit solvers, we propose a phenomenological, feed-forward model implemented in FAUST. Let $x[n]$ denote the normalized input signal.
+
+Step 1 — Half-Wave Rectification: The increase in cathode current occurs predominantly during the positive half-cycles of the input signal. We approximate the charging source using half-wave rectification: $$ x_{rect}[n] = \max(0, x[n]) \tag{6} $$
+
+Step 2 — RC Low-Pass Filtering: The behavior of the $R_k C_k$ network is modeled using a simple first-order IIR low-pass filter, which tracks the envelope of the rectified signal: $$ e_{cath}[n] = e_{cath}[n-1] + \alpha \cdot (x_{rect}[n] - e_{cath}[n-1]) \tag{7} $$ where $\alpha = 1 / \max(1, \tau \cdot f_s \cdot 10^{-3})$, $\tau$ is the RC time constant in milliseconds, and $f_s$ is the sampling rate. This envelope represents the dynamic variation in the cathode voltage $\Delta V_k$.
+
+Step 3 — Operating Point Shift: The envelope is scaled and subtracted from the input of the nonlinear stage. The effective bias shift $\Delta b[n]$ is given by: $$ \Delta b[n] = S_{cath} \cdot e_{cath}[n] \tag{8} $$ where $S_{cath}$ is a scaling factor governing the magnitude of the bias excursion. The finalized triode transfer function becomes: $$ y[n] = \tanh\bigl(a \cdot x[n] + b - \Delta b[n]\bigr) \tag{9} $$ where $a$ is the drive/gain and $b$ is the static bias. Note that subtracting $\Delta b[n]$ shifts the operating point to the left (more negative $V_{gk}$), accurately simulating a colder bias resulting from cathode capacitor charging.
+
+3.3.3 Parameter Analysis and Figure Descriptions
+Figure 1 — Core Functions of the Cathode Bias Model. Figure 1 illustrates the foundational mechanics. Panel (a) shows the half-wave rectification; only the positive peaks (which represent the surges in cathode current) contribute to the charging of the virtual capacitor. Panel (b) shows the static effect of the resulting voltage shift on the $\tanh$ transfer function. As the 
+scale
+ factor increases, the operating point is pushed further into the lower "knee" of the curve, yielding increased asymmetry and reduced overall gain.
+
+Figure 2 — RC Time Constant Dynamics. This figure highlights the temporal behavior controlled by the time constant $\tau$. Given a burst of a sustained note followed by silence (a), panel (b) shows the accumulation and decay of the cathode bias $\Delta b(t)$. A short time constant ($\tau = 10$ ms) typical of modern high-gain amplifiers (e.g., Peavey 5150) results in a tight, fast tracking of the envelope. A longer time constant ($\tau = 100{-}250$ ms), characteristic of vintage designs like older Vox or Fender circuits, creates a slow, "breathing" compression that lags behind the player's picking attack, often described by musicians as a "spongy" feel.
+
+Figure 3 — Scale Parameter and Progressive Compression. Figure 3 explores the impact of the scale parameter $S_{cath}$. Panel (a) shows the output waveform in the time domain; higher scale values result in noticeable asymmetrical clipping on the bottom half of the waveform as the bias shifts downward. Panel (b) reveals the RMS envelope of the output over time. While the input amplitude is constant, the output RMS progressively decreases as the cathode capacitor charges. This effectively acts as an attack-release envelope compressor, where the "sag" physically limits the sustained volume.
+
+Figure 4 — Harmonic Spectrum Comparison. The FFT spectrum in Figure 4 compares the steady-state harmonic output of a stage with and without the cathode bias active. The dynamic bias shift fundamentally breaks the odd symmetry of the standard $\tanh$ curve. Consequently, the model with cathode bias engaged exhibits a dramatic increase in even-order harmonics (H2, H4, H6), adding the characteristic musical "warmth" typical of single-ended and non-perfectly-balanced push-pull tube designs.
+
+Figure 5 — Amplifier Preset Comparison. Our model parametrizes physical circuit variations into specific profiles. Figure 5 shows how different amplifier archetypes respond to the same input stimulus. The "Peavey 5150" preset uses a very short $\tau$ and high scale, reaching maximum bias shift almost instantly and maintaining a harsh, tight tone. Conversely, the "Fender Twin" and "Vox AC30" presets exhibit a slower, more deliberate curve, reflecting their larger cathode bypass capacitors. Panel (b) translates these bias trajectories into the resulting dynamic output waveforms.
+
+Figure 6 — Multi-Stage Accumulation. A key strength of this methodology is its distributability. In Figure 6, a three-stage preamp (configured like a Marshall JCM800) is simulated. Each stage independently calculates its own cathode bias based on the signal scaling and clipping of the previous stages. Stage 1 experiences mild sag; Stage 2, driven harder, yields a more pronounced bias shift; Stage 3 is hit with a heavily clipped and asymmetrical signal, resulting in its own distinct DC tracking behavior. This cascading interaction generates an exceptionally rich, complex, and physically plausible dynamic response that a global static waveshaper cannot replicate.
+
+3.3.4 Model Validity and Limitations
+The proposed cathode bias model efficiently captures the fundamental psychoacoustic and dynamic characteristics of physical tube amplifier sag:
+
+Asymmetrical Ck Charging: Approximated successfully via half-wave rectification (Eq. 6).
+Time-Variant Gain/Compression: Handled by the first-order RC smoothing filter (Eq. 7).
+Dynamic Harmonic Evolution: Captured by shifting the operating point of the nonlinear function (Eqs. 8–9).
+By operating strictly in a feed-forward manner, the algorithm avoids zero-delay feedback loops (ZDF) and iterative solvers (e.g., Newton-Raphson), making it extraordinarily cheap to process ($\mathcal{O}(1)$ operations per sample). It compiles efficiently to WebAssembly for real-time, in-browser use.
+
+However, the simplifications introduce minor discrepancies relative to a full SPICE simulation. First, using strict half-wave rectification is an exaggeration; in a physical tube, the cathode current is continuous but highly non-linear. Second, the model ignores the interaction between the anode voltage and the cathode current (the Miller effect and plate resistance variations are not dynamically modeled). Lastly, the decoupling of the grid current model (Section 3.2) and the cathode bias model prevents cross-modulation where severe grid current could further alter the cathode voltage.
+
+Despite these physical simplifications, perceptual validation confirms that the model robustly delivers the coveted "spongy" feel, attack envelope shaping, and harmonic bloom that musicians expect from genuine tube preamplification, all while remaining highly parameterizable.
+

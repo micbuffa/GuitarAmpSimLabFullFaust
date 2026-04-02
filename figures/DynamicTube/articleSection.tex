@@ -1,0 +1,29 @@
+3.4 Dynamic Tube Stage
+3.4.1 Gray-Box Modeling Approach
+While the static nonlinearity (Section 3.1) and the parasitic models (Sections 3.2 and 3.3) capture the core components of tube Distortion, a truly authentic simulation must account for the dynamic interactions between the signal envelope and the tube's operating parameters. We propose a "gray-box" dynamic tube stage model, implemented as MODEL 2 in our framework, which modulates the transfer function in real-time based on the player's performance.
+
+The model is defined by a pair of coupled modulation equations:
+\begin{align}
+d[n] &= d_0 + k_F \cdot e_F[n] - k_S \cdot e_S[n] \tag{12} \\
+b[n] &= b_0 + k_B \cdot e_S[n] \tag{13} \\
+y[n] &= \tanh\bigl(d[n] \cdot (x[n] + b[n])\bigr) \tag{14}
+\end{align}
+
+where $e_F[n]$ and $e_S[n]$ are fast and slow envelope followers, respectively. Parameters $k_F$, $k_S$, and $k_B$ govern the sensitivity of the tube to these dynamic signals.
+
+3.4.2 Dynamic Parameters and Psychoacoustics
+The dynamic model introduces several high-level behaviors that are central to the "tube experience":
+
+Touch Sensitivity ($k_F, \tau_F$): The fast modulation $k_F$ increases the drive $d[n]$ instantaneously in response to pick transients. This produces a "bloom" effect where the distortion intensifies during the attack before settling, providing the articulate response highly valued by lead guitarists.
+Power Supply Sag ($k_S, \tau_S$): The slow modulation $k_S$ reduces the drive as the average signal level increases. This simulates the voltage drop (sag) in the power supply's B+ rail and the current-limiting effects of the plate and screen resistors. Perceptually, this manifests as a natural, "spongy" compression that smooths out the player's dynamics.
+Dynamic Operating Point ($k_B$): Perhaps the most sophisticated feature, $k_B$ allows the bias $b[n]$ to shift over time. As shown in Section 3.1, bias determines the H2/H3 harmonic balance. By making this shift dynamic, the "character" of the distortion evolves as a note sustains, moving from a symmetrical to an asymmetrical state.
+
+3.4.3 Figure Descriptions and Interpretation
+Figure 1 — Envelopes and Parameter Modulation. This figure demonstrates the real-time tracking of the model. Panel (a) shows the input signal (a burst) and the two envelope followers. Panel (b) reveals the resulting dynamic drive $d(t)$; note the initial overshoot caused by $k_F$ followed by the gradual sag caused by $k_S$. Panel (c) shows the bias $b(t)$ crawling toward a more negative value during the burst, simulating the dynamic accumulation of charge in the cathode and grid circuits.
+
+Figure 2 — Static vs. Dynamic Comparison. Panel (a) highlights the "sag" effect in the time domain using an RMS envelope. Unlike the static model which has a flat response, the dynamic model exhibits a natural gain reduction over the first 100ms of the note. Panel (b) compares the waveform at the start of a note versus its sustained tail; the operating point shift is visible as the waveform becomes progressively more asymmetrical.
+
+Figure 3 — Dynamic Harmonic Balance. This analysis tracks the second (H2) and third (H3) harmonics over the duration of a sustained note. While H3 remains relatively stable due to the constant input level, H2 grows significantly as the dynamic bias $k_B$ shifts the operating point. This "harmonic bloom" is a hallmark of high-quality tube amplification that is missing in purely static waveshaping models.
+
+3.4.4 Application to Tube Archetypes
+By adjusting these dynamic coefficients, we can emulate different tube types within the same mathematical framework. For example, a 12AX7 preset is configured with high $k_F$ for maximum touch sensitivity, whereas a 6V6 power tube emulation utilizes a higher $k_S$ and longer $\tau_S$ to emphasize the characteristic "squish" and sag of a vintage power amplifier.
