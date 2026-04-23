@@ -100,10 +100,10 @@ model  = hgroup("4 Tonestack", hgroup("tonestack type",
 // Passive tonestacks inherently lose signal (typically -15 to -25 dB depending
 // on component values and knob settings). These makeup gains bring each model
 // back to approximately unity gain at "noon" settings (bass=0.5, mid=0.3, treble=0.75).
-// Values are in linear gain (dB equivalent shown in comments).
+// Values computed by compute_tonestack_gains.py using broadband RMS (signal.wav).
+// Ensures output perceived volume remains constant when bypassed.
 //                                Mesa     JCM800   AC30     Fender Deville
-//                                ~+20dB   ~+18dB   ~+22dB   ~+16dB
-makeupGainTable = 10.0, 8.0, 12.5, 6.3;
+makeupGainTable = 6.93, 2.13, 5.48, 6.10;
 makeupGain = makeupGainTable : ba.selectn(NMODELS, model);
 
 // ---- model selector using ba.selectn ---------------------------------------

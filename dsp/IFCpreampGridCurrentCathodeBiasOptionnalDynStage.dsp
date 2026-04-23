@@ -35,9 +35,9 @@ declare license   "LGPL";
 */
 
 // ------ PREAMP ----@-
-input_vol = hgroup("2 Preamp", hslider("Input Vol[stratus:0][style:knob]", 1.0, 0.0, 3.0, 0.01)) : si.smoo;
-gain_knob = hgroup("2 Preamp", hslider("Interstage Gain[stratus:1][style:knob]", 0.07, 0.01, 1.0, 0.01)) : si.smoo;
-preamp_out = hgroup("2 Preamp", hslider("Master Vol[stratus:2][style:knob]", 1.0, 0.0, 5.0, 0.01)) : si.smoo;
+input_vol = hgroup("2 Preamp", hslider("Input Vol[style:knob]", 1.0, 0.0, 3.0, 0.01)) : si.smoo;
+gain_knob = hgroup("2 Preamp", hslider("Interstage Gain[style:knob]", 0.07, 0.01, 1.0, 0.01)) : si.smoo;
+preamp_out = hgroup("2 Preamp", hslider("Master Vol[style:knob]", 1.0, 0.0, 5.0, 0.01)) : si.smoo;
 
 // Interstage gain normalization: compensates for the 12× spread in sensitivity
 // between presets (Fender=very reactive, Peavey=barely reactive to same gk).
@@ -49,14 +49,25 @@ gk_scale = (1.00,   0.43,    2.22,   0.24,  0.48,   0.19,   1.00,   0.24,   0.34
 // gk_eff is used in all interstage connections instead of raw gain_knob
 gk = gain_knob * gk_scale;
 
+// Dynamic compensation: keeps output constant when gain_knob changes.
+// Uses tanh-based model per preset: accounts for nonlinear saturation in S2.
+//   - triode_a2 × gk_scale = per-preset sensitivity of S2 to gk
+//   - tanh ratio: in linear regime → ≈ 0.07/gain_knob (clean amps)
+//                 in saturated regime → ≈ 1.0 (hi-gain amps, output barely changes)
+s2_eff_sens = triode_a2 * gk_scale;
+gk_comp_ratio = ma.tanh(s2_eff_sens * 0.07)
+              / max(0.001, ma.tanh(s2_eff_sens * max(0.001, gain_knob)));
+// Disable for 1-stage mode (interstage gain not used)
+gk_comp = select2(preamp_stages > 0, 1.0, gk_comp_ratio) : si.smoo;
+
 // Master amp model selector — drives all sub-presets simultaneously
 // 0=Custom (use individual UI sliders), 1-8 = specific amp model
 // Indices: 0=Custom, 1=Marshall JCM800, 2=Fender Twin, 3=Mesa Dual Rect, 4=Vox AC30, 5=Peavey 5150, 6=Fender Deluxe, 7=Soldano SLO-100, 8=Orange Rockerverb
-amp_preset = hgroup("2 Preamp", nentry("Amp Model[stratus:4][style:menu{'Custom':0;'Marshall JCM800':1;'Fender Twin Reverb':2;'Mesa Dual Rectifier':3;'Vox AC30 Top Boost':4;'Peavey 5150':5;'Fender Deluxe':6;'Soldano SLO-100':7;'Orange Rockerverb':8}]", 6, 0, 8, 1)) : int;
+amp_preset = hgroup("2 Preamp", nentry("Amp Model[style:menu{'Custom':0;'Marshall JCM800':1;'Fender Twin Reverb':2;'Mesa Dual Rectifier':3;'Vox AC30 Top Boost':4;'Peavey 5150':5;'Fender Deluxe':6;'Soldano SLO-100':7;'Orange Rockerverb':8}]", 6, 0, 8, 1)) : int;
 
 // ADAA Oversampling feature — uses Faust's official aa.tanh1 from aanl.lib
 // (ADAA1 anti-aliased tanh with logcosh antiderivative, maintained by Grame)
-os_enable_ui = hgroup("2 Preamp", checkbox("Oversampling MODEL 1[stratus:3]")) : int;
+os_enable_ui = hgroup("2 Preamp", checkbox("Oversampling MODEL 1]")) : int;
 smart_tanh = _ <: select2(os_enable_ui, ma.tanh, aa.tanh1);
 
 // -----------------------------------------------------------------------------
@@ -123,11 +134,11 @@ gc_preset = amp_preset;
 // Physique : le premier étage est le moins sollicité, le signal d'entrée est faible
 // → grid current peu probable sauf en amplification extrême (hi-gain)
 // -----------------------------------------------------------------------------
-gc1_enable_ui  = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 1[stratus:0]", checkbox("Enable[stratus:0]")));
-gc1_vth_ui     = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 1[stratus:0]", hslider("Threshold[stratus:1]",   0.7,  0.05, 0.90, 0.01))) : si.smoo;
-gc1_amtIn_ui   = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 1[stratus:0]", hslider("Input Push[stratus:2]",  0.05, 0.0,  1.0,  0.01))) : si.smoo;
-gc1_amtBias_ui = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 1[stratus:0]", hslider("Bias Push[stratus:3]",   0.05, 0.0,  1.0,  0.01))) : si.smoo;
-gc1_tau_ui     = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 1[stratus:0]", hslider("Recovery ms[stratus:4]", 80.0, 5.0, 500.0, 1.0)))  : si.smoo;
+gc1_enable_ui  = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 1]", checkbox("Enable]")));
+gc1_vth_ui     = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 1]", hslider("Threshold]",   0.7,  0.05, 0.90, 0.01))) : si.smoo;
+gc1_amtIn_ui   = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 1]", hslider("Input Push]",  0.05, 0.0,  1.0,  0.01))) : si.smoo;
+gc1_amtBias_ui = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 1]", hslider("Bias Push]",   0.05, 0.0,  1.0,  0.01))) : si.smoo;
+gc1_tau_ui     = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 1]", hslider("Recovery ms]", 80.0, 5.0, 500.0, 1.0)))  : si.smoo;
 
 //              Custom        Marshall    Fender    Mesa   Vox  Peavey  Deluxe Soldano Orange
 grid1_enable  = (gc1_enable_ui,  0,         0,      1,      0,     1,    0,     0,     1)     : ba.selectn(9, gc_preset) : si.smoo;
@@ -141,11 +152,11 @@ grid1_tau     = (gc1_tau_ui,     40.0,      120.0,  30.0,   60.0,  25.0, 80.0,  
 // Physique : le signal est plus fort (post-stage1), le grid current est plus probable
 // → activation sur Marshall, Mesa, Peavey, Soldano, Orange
 // -----------------------------------------------------------------------------
-gc2_enable_ui  = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 2[stratus:1]", checkbox("Enable[stratus:0]")));
-gc2_vth_ui     = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 2[stratus:1]", hslider("Threshold[stratus:1]",   0.7,  0.05, 0.90, 0.01))) : si.smoo;
-gc2_amtIn_ui   = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 2[stratus:1]", hslider("Input Push[stratus:2]",  0.05, 0.0,  1.0,  0.01))) : si.smoo;
-gc2_amtBias_ui = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 2[stratus:1]", hslider("Bias Push[stratus:3]",   0.05, 0.0,  1.0,  0.01))) : si.smoo;
-gc2_tau_ui     = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 2[stratus:1]", hslider("Recovery ms[stratus:4]", 80.0, 5.0, 500.0, 1.0)))  : si.smoo;
+gc2_enable_ui  = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 2]", checkbox("Enable]")));
+gc2_vth_ui     = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 2]", hslider("Threshold]",   0.7,  0.05, 0.90, 0.01))) : si.smoo;
+gc2_amtIn_ui   = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 2]", hslider("Input Push]",  0.05, 0.0,  1.0,  0.01))) : si.smoo;
+gc2_amtBias_ui = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 2]", hslider("Bias Push]",   0.05, 0.0,  1.0,  0.01))) : si.smoo;
+gc2_tau_ui     = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 2]", hslider("Recovery ms]", 80.0, 5.0, 500.0, 1.0)))  : si.smoo;
 
 //               Custom        Marshall   Fender  Mesa     Vox  Peavey  Deluxe Soldano Orange
 grid2_enable  = (gc2_enable_ui,  1,         0,      1,      1,     1,    0,     1,     1)     : ba.selectn(9, gc_preset) : si.smoo;
@@ -159,11 +170,11 @@ grid2_tau     = (gc2_tau_ui,     60.0,      120.0,  50.0,   80.0,  40.0, 80.0,  
 // Physique : signal le plus fort → le plus susceptible de déclencher le courant
 // → activation sur la plupart des amplis hi-gain
 // -----------------------------------------------------------------------------
-gc3_enable_ui  = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 3[stratus:2]", checkbox("Enable[stratus:0]")));
-gc3_vth_ui     = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 3[stratus:2]", hslider("Threshold[stratus:1]",   0.7,  0.05, 0.90, 0.01))) : si.smoo;
-gc3_amtIn_ui   = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 3[stratus:2]", hslider("Input Push[stratus:2]",  0.05, 0.0,  1.0,  0.01))) : si.smoo;
-gc3_amtBias_ui = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 3[stratus:2]", hslider("Bias Push[stratus:3]",   0.05, 0.0,  1.0,  0.01))) : si.smoo;
-gc3_tau_ui     = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 3[stratus:2]", hslider("Recovery ms[stratus:4]", 80.0, 5.0, 500.0, 1.0)))  : si.smoo;
+gc3_enable_ui  = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 3]", checkbox("Enable]")));
+gc3_vth_ui     = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 3]", hslider("Threshold]",   0.7,  0.05, 0.90, 0.01))) : si.smoo;
+gc3_amtIn_ui   = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 3]", hslider("Input Push]",  0.05, 0.0,  1.0,  0.01))) : si.smoo;
+gc3_amtBias_ui = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 3]", hslider("Bias Push]",   0.05, 0.0,  1.0,  0.01))) : si.smoo;
+gc3_tau_ui     = hgroup("2 Preamp/1 Grid Current (MODEL 1)", vgroup("Stage 3]", hslider("Recovery ms]", 80.0, 5.0, 500.0, 1.0)))  : si.smoo;
 
 //               Custom        Marshall   Fender   Mesa    Vox  Peavey Deluxe Soldano Orange
 grid3_enable  = (gc3_enable_ui,  1,         0,      1,      0,     1,    0,     1,     1)     : ba.selectn(9, gc_preset) : si.smoo;
@@ -219,9 +230,9 @@ cath_preset = amp_preset;
 // Cathode Bias Stage 1
 // Physique : Rk élevé (1500-2700Ω), Ck≈25µF → tau=37-68ms. Sag lent.
 // -----------------------------------------------------------------------------
-cath1_en_ui    = hgroup("2 Preamp/3 Cathode Bias (MODEL 1)", vgroup("Stage 1[stratus:0]", checkbox("Enable[stratus:0]")));
-cath1_tau_ui   = hgroup("2 Preamp/3 Cathode Bias (MODEL 1)", vgroup("Stage 1[stratus:0]", hslider("RC Time (ms)[stratus:1]", 40.0,  5.0, 300.0, 1.0))) : si.smoo;
-cath1_scale_ui = hgroup("2 Preamp/3 Cathode Bias (MODEL 1)", vgroup("Stage 1[stratus:0]", hslider("Shift Factor[stratus:2]",  0.08,  0.0,   0.5, 0.01))) : si.smoo;
+cath1_en_ui    = hgroup("2 Preamp/3 Cathode Bias (MODEL 1)", vgroup("Stage 1]", checkbox("Enable]")));
+cath1_tau_ui   = hgroup("2 Preamp/3 Cathode Bias (MODEL 1)", vgroup("Stage 1]", hslider("RC Time (ms)]", 40.0,  5.0, 300.0, 1.0))) : si.smoo;
+cath1_scale_ui = hgroup("2 Preamp/3 Cathode Bias (MODEL 1)", vgroup("Stage 1]", hslider("Shift Factor]",  0.08,  0.0,   0.5, 0.01))) : si.smoo;
 
 //             Custom       Marshall     Fender    Mesa   Vox   Peavey  Deluxe Soldano Orange
 cath1_en    = (cath1_en_ui,    1,           1,       1,     1,    1,     1,     1,     1)   : ba.selectn(9, cath_preset);
@@ -232,9 +243,9 @@ cath1_scale = (cath1_scale_ui, 0.12,        0.08,    0.15,  0.18, 0.20,  0.08,  
 // Cathode Bias Stage 2
 // Physique : Rk moyen (820-1500Ω), Ck≈25µF → tau=20-38ms. Signal plus fort.
 // -----------------------------------------------------------------------------
-cath2_en_ui    = hgroup("2 Preamp/3 Cathode Bias (MODEL 1)", vgroup("Stage 2[stratus:1]", checkbox("Enable[stratus:0]")));
-cath2_tau_ui   = hgroup("2 Preamp/3 Cathode Bias (MODEL 1)", vgroup("Stage 2[stratus:1]", hslider("RC Time (ms)[stratus:1]", 25.0,  5.0, 300.0, 1.0))) : si.smoo;
-cath2_scale_ui = hgroup("2 Preamp/3 Cathode Bias (MODEL 1)", vgroup("Stage 2[stratus:1]", hslider("Shift Factor[stratus:2]",  0.10,  0.0,   0.5, 0.01))) : si.smoo;
+cath2_en_ui    = hgroup("2 Preamp/3 Cathode Bias (MODEL 1)", vgroup("Stage 2]", checkbox("Enable]")));
+cath2_tau_ui   = hgroup("2 Preamp/3 Cathode Bias (MODEL 1)", vgroup("Stage 2]", hslider("RC Time (ms)]", 25.0,  5.0, 300.0, 1.0))) : si.smoo;
+cath2_scale_ui = hgroup("2 Preamp/3 Cathode Bias (MODEL 1)", vgroup("Stage 2]", hslider("Shift Factor]",  0.10,  0.0,   0.5, 0.01))) : si.smoo;
 
 //             Custom       Marshall      Fender  Mesa    Vox   Peavey  Deluxe Soldano Orange
 cath2_en    = (cath2_en_ui,    1,           1,       1,     1,    1,     1,     1,     1)   : ba.selectn(9, cath_preset);
@@ -246,9 +257,9 @@ cath2_scale = (cath2_scale_ui, 0.18,        0.08,    0.22,  0.22, 0.30,  0.10,  
 // Physique : Rk faible (470-820Ω) → tau court. Stage driver très sollicité.
 // Désactivé pour Fender Deluxe/Twin (pas de 3e triode préampli dans le circuit réel)
 // -----------------------------------------------------------------------------
-cath3_en_ui    = hgroup("2 Preamp/3 Cathode Bias (MODEL 1)", vgroup("Stage 3[stratus:2]", checkbox("Enable[stratus:0]")));
-cath3_tau_ui   = hgroup("2 Preamp/3 Cathode Bias (MODEL 1)", vgroup("Stage 3[stratus:2]", hslider("RC Time (ms)[stratus:1]", 25.0,  5.0, 300.0, 1.0))) : si.smoo;
-cath3_scale_ui = hgroup("2 Preamp/3 Cathode Bias (MODEL 1)", vgroup("Stage 3[stratus:2]", hslider("Shift Factor[stratus:2]",  0.08,  0.0,   0.5, 0.01))) : si.smoo;
+cath3_en_ui    = hgroup("2 Preamp/3 Cathode Bias (MODEL 1)", vgroup("Stage 3]", checkbox("Enable]")));
+cath3_tau_ui   = hgroup("2 Preamp/3 Cathode Bias (MODEL 1)", vgroup("Stage 3]", hslider("RC Time (ms)]", 25.0,  5.0, 300.0, 1.0))) : si.smoo;
+cath3_scale_ui = hgroup("2 Preamp/3 Cathode Bias (MODEL 1)", vgroup("Stage 3]", hslider("Shift Factor]",  0.08,  0.0,   0.5, 0.01))) : si.smoo;
 
 //             Custom       Marshall     Fender     Mesa   Vox Peavey  Deluxe Soldano Orange
 cath3_en    = (cath3_en_ui,    1,           0,       1,     1,    1,     0,     1,     1)   : ba.selectn(9, cath_preset);
@@ -262,14 +273,14 @@ cath3_scale = (cath3_scale_ui, 0.22,        0.06,    0.28,  0.18, 0.38,  0.08,  
 // amp_preset drives this — when 0 (Custom), the UI sliders below are used
 triode_preset = amp_preset;
 
-triode_a1_ui = hgroup("2 Preamp/2 Triode Characteristics (MODEL 1)", hslider("V1 Drive (a)[stratus:1]", 4.5, 0.5, 15.0, 0.01));
-triode_b1_ui = hgroup("2 Preamp/2 Triode Characteristics (MODEL 1)", hslider("V1 Bias (b)[stratus:2]", -0.08, -0.50, 0.05, 0.001));
+triode_a1_ui = hgroup("2 Preamp/2 Triode Characteristics (MODEL 1)", hslider("V1 Drive (a)]", 4.5, 0.5, 15.0, 0.01));
+triode_b1_ui = hgroup("2 Preamp/2 Triode Characteristics (MODEL 1)", hslider("V1 Bias (b)]", -0.08, -0.50, 0.05, 0.001));
 
-triode_a2_ui = hgroup("2 Preamp/2 Triode Characteristics (MODEL 1)", hslider("V2 Drive (a)[stratus:3]", 2.5, 0.5, 15.0, 0.01));
-triode_b2_ui = hgroup("2 Preamp/2 Triode Characteristics (MODEL 1)", hslider("V2 Bias (b)[stratus:4]", -0.10, -0.50, 0.05, 0.001));
+triode_a2_ui = hgroup("2 Preamp/2 Triode Characteristics (MODEL 1)", hslider("V2 Drive (a)]", 2.5, 0.5, 15.0, 0.01));
+triode_b2_ui = hgroup("2 Preamp/2 Triode Characteristics (MODEL 1)", hslider("V2 Bias (b)]", -0.10, -0.50, 0.05, 0.001));
 
-triode_a3_ui = hgroup("2 Preamp/2 Triode Characteristics (MODEL 1)", hslider("V3 Drive (a)[stratus:5]", 3.0, 0.5, 15.0, 0.01));
-triode_b3_ui = hgroup("2 Preamp/2 Triode Characteristics (MODEL 1)", hslider("V3 Bias (b)[stratus:6]", -0.10, -0.50, 0.05, 0.001));
+triode_a3_ui = hgroup("2 Preamp/2 Triode Characteristics (MODEL 1)", hslider("V3 Drive (a)]", 3.0, 0.5, 15.0, 0.01));
+triode_b3_ui = hgroup("2 Preamp/2 Triode Characteristics (MODEL 1)", hslider("V3 Bias (b)]", -0.10, -0.50, 0.05, 0.001));
 
 // PRESETS DES VALEURS DES PARAMETRES DES LAMPES, ETAGES "STATIQUES"
 // ---------------------
@@ -355,57 +366,31 @@ triode_b3 = (triode_b3_ui, -0.15, -0.06, -0.20, -0.06, -0.18, -0.10, -0.18, -0.1
 // -----------------------------------------------------------------------------
 tube_mode = hgroup(
     "2 Preamp",
-    nentry("Last stage model (MODEL 2)[stratus:2][style:menu{'Static':0;'Dynamic Asym':1}]", 0, 0, 1, 1)
+    nentry("Last stage model (MODEL 2)[style:menu{'Static':0;'Dynamic (Match Amp Preset)':1;'Dynamic (Manual Knobs)':2}]", 0, 0, 2, 1)
 ) : int;
 
-// =============================================================================
+is_dyn = tube_mode > 0;
+is_dyn_f = float(is_dyn);
+
+// -----------------------------------------------------------------------------
 // Dynamic Tube Stage — presets par ampli
-// Paramètres du DERNIER étage (stage driver), remplacé par le modèle dynamique
-// si tube_mode = "Dynamic Asym"
-// amp_preset pilote dyn_preset → les valeurs Custom (index 0) sont les sliders UI
-// =============================================================================
-// Paramètre | Description physique
-// drive0    : gain tube au repos (µ × Rload/rp). Plus élevé = plus saturé
-// inScale   : atténuation du signal entrant (évite saturation totale permanente)
-// biasOffset: Vgk au repos (0=symétrique/impairs ; < 0 = asymétrie/H2)
-// tauF (ms) : RC rapide (Cgk, réseau grid) → réaction à l'attaque
-// tauS (ms) : RC lent (B+, condensateurs cathode) → sag en sustain
-// kF        : boost drive sur attaque (eF) → "mordant", plus de drive sur pick fort
-// kS        : réduction drive en sustain (eS) → sag, compression progressive
-// kB        : dérive du biais en sustain → asymétrie dynamique (signature du modèle)
-// postGain  : niveau de sortie post-saturation (compensation de niveau)
-// =============================================================================
-// Caractère par ampli pour le driver stage :
-//   Marshall  : mordant sur attaque (kF=2.0), sag classique (tauS=100ms)
-//   Fender Twin : très clean, presque pas de dynamiques (drive faible, kF=0.5)
-//   Mesa Rect.: tight = tauS court (80ms), drive élevé, kS fort (compression)
-//   Vox AC30  : Class A = tauS très long (200ms), kB élevé (dérive bias importante)
-//   Peavey    : le plus agressif : drive max, kF max, tauS le plus court (60ms)
-//   Deluxe    : clean/léger, drive minimal, dynamiques subtiles
-//   Soldano   : smooth high-gain, drive élevé mais kF modéré (pas trop agressif)
-//   Orange    : warm/punchy, drive modéré, tous paramètres équilibrés
-// =============================================================================
-
+// -----------------------------------------------------------------------------
 // Sliders Custom (index 0 dans les tables)
-dyn_inScale_c       = hgroup("1 Dynamic Tube (MODEL 2)", hslider("Input Scale[stratus:0][style:knob]",  1.32, 0.05,  2.0,  0.01)) : si.smoo;
-dyn_tauF_c          = hgroup("1 Dynamic Tube (MODEL 2)", hslider("Attack ms[stratus:1][style:knob]",    2.0,  0.5, 15.0,  0.1))  : si.smoo;
-dyn_tauS_c          = hgroup("1 Dynamic Tube (MODEL 2)", hslider("Release ms[stratus:2][style:knob]", 120.0, 10.0,500.0,  1.0))  : si.smoo;
-dyn_drive0_c        = hgroup("1 Dynamic Tube (MODEL 2)", hslider("Drive[stratus:3][style:knob]",        2.2,  0.5, 15.0,  0.01)) : si.smoo;
-dyn_biasOffset_c    = hgroup("1 Dynamic Tube (MODEL 2)", hslider("Bias Offset[stratus:4][style:knob]", -0.153,-0.5,  0.3, 0.001)) : si.smoo;
-dyn_kF_c            = hgroup("1 Dynamic Tube (MODEL 2)", hslider("Dyn Fast[stratus:5][style:knob]",    1.5, -5.0,  8.0,  0.01)) : si.smoo;
-dyn_kS_c            = hgroup("1 Dynamic Tube (MODEL 2)", hslider("Dyn Slow[stratus:6][style:knob]",    0.8, -3.0,  5.0,  0.01)) : si.smoo;
-dyn_kB_c            = hgroup("1 Dynamic Tube (MODEL 2)", hslider("Dyn Bias[stratus:7][style:knob]",    0.12,-1.0,  1.0, 0.001)) : si.smoo;
-dyn_biasEnvEn_c     = hgroup("1 Dynamic Tube (MODEL 2)", checkbox("Bias(env) enable[stratus:8][hidden:1]")) : int : si.smoo;
-dyn_postGain_c      = hgroup("1 Dynamic Tube (MODEL 2)", hslider("Output Gain[stratus:9][style:knob]",        1.375,  0.1,  3.0, 0.001)) : si.smoo;
+dyn_inScale_c       = hgroup("1 Dynamic Tube (MODEL 2)", hslider("[1]In Scale[style:knob]",  1.32, 0.05,  2.0,  0.01)) : si.smoo;
+dyn_tauF_c          = hgroup("1 Dynamic Tube (MODEL 2)", hslider("[2]Attack[style:knob]",    2.0,  0.5, 15.0,  0.1))  : si.smoo;
+dyn_tauS_c          = hgroup("1 Dynamic Tube (MODEL 2)", hslider("[3]Release[style:knob]", 120.0, 10.0,500.0,  1.0))  : si.smoo;
+dyn_drive0_c        = hgroup("1 Dynamic Tube (MODEL 2)", hslider("[4]Drive[style:knob]",        2.2,  0.5, 15.0,  0.01)) : si.smoo;
+dyn_biasOffset_c    = hgroup("1 Dynamic Tube (MODEL 2)", hslider("[5]Bias[style:knob]", -0.153,-0.5,  0.3, 0.001)) : si.smoo;
+dyn_kF_c            = hgroup("1 Dynamic Tube (MODEL 2)", hslider("[6]DynF[style:knob]",    1.5, -5.0,  8.0,  0.01)) : si.smoo;
+dyn_kS_c            = hgroup("1 Dynamic Tube (MODEL 2)", hslider("[7]DynS[style:knob]",    0.8, -3.0,  5.0,  0.01)) : si.smoo;
+dyn_kB_c            = hgroup("1 Dynamic Tube (MODEL 2)", hslider("[8]DynB[style:knob]",    0.12,-1.0,  1.0, 0.001)) : si.smoo;
+dyn_biasEnvEn_c     = hgroup("1 Dynamic Tube (MODEL 2)", checkbox("[81]BiasEnv[hidden:1]")) : int : si.smoo;
+dyn_postGain_c      = hgroup("1 Dynamic Tube (MODEL 2)", hslider("[9]Out Gain[style:knob]",        1.375,  0.1,  3.0, 0.001)) : si.smoo;
 
-// amp_preset pilote le sélecteur dynamique
-dyn_preset = amp_preset;
+// If tube_mode == 2 (Manual Knobs), force preset index to 0 (Custom) so sliders are active.
+// Otherwise (tube_mode == 1), follow the global amp_preset.
+dyn_preset = select2(tube_mode == 2, amp_preset, 0);
 
-// Preset tables (idx: 0=Custom, 1=Marshall, 2=Fender Twin, 3=Mesa, 4=Vox, 5=Peavey, 6=Deluxe, 7=Soldano, 8=Orange)
-// Recalibration note: pour un niveau comparable au statique,
-// on veut drive × inScale × signal ≈ 1.5–3.0 (même plage que a × signal dans le statique)
-// Avant fix: drive=3 × inScale=0.2 × signal=0.5 → tanh(0.3)=0.29 → quasi-inaudible
-// Après fix: drive=3 × inScale=0.8 × signal=0.5 → tanh(1.2)=0.83 → bon niveau
 dyn_drive0_ui        = (dyn_drive0_c,     5.0,  2.5,  6.0,  4.0,  7.0,  3.0,  5.5,  4.5) : ba.selectn(9, dyn_preset) : si.smoo;
 dyn_inScale_ui       = (dyn_inScale_c,    0.35, 0.20, 0.40, 0.30, 0.45, 0.20, 0.35, 0.32) : ba.selectn(9, dyn_preset) : si.smoo;
 dyn_biasOffset_ui    = (dyn_biasOffset_c,-0.12,-0.05,-0.15,-0.08,-0.10,-0.08,-0.12,-0.10) : ba.selectn(9, dyn_preset) : si.smoo;
@@ -418,22 +403,32 @@ dyn_biasEnvEnable_ui = (dyn_biasEnvEn_c,  1,    1,    1,    1,    1,    1,    1,
 dyn_postGain_ui      = (dyn_postGain_c,   1.0,  1.0,  1.0,  1.0,  1.0,  1.0,  1.0,  1.0) : ba.selectn(9, dyn_preset) : si.smoo;
 
 
-
-
-tube_mode_f = float(tube_mode);
-
 dyn_drive0_eff        = dyn_drive0_ui;
-dyn_inScale_eff       = (1.0 - tube_mode_f) * 1.0 + tube_mode_f * dyn_inScale_ui;
-dyn_biasOffset_eff    = tube_mode_f * dyn_biasOffset_ui;
-dyn_tauF_eff          = (1.0 - tube_mode_f) * 3.0 + tube_mode_f * dyn_tauF_ui;
-dyn_tauS_eff          = (1.0 - tube_mode_f) * 80.0 + tube_mode_f * dyn_tauS_ui;
-dyn_kF_eff            = tube_mode_f * dyn_kF_ui;
-dyn_kS_eff            = tube_mode_f * dyn_kS_ui;
-dyn_kB_eff            = tube_mode_f * dyn_kB_ui;
-dyn_biasEnvEnable_eff = tube_mode_f * dyn_biasEnvEnable_ui;
-dyn_postGain_eff      = (1.0 - tube_mode_f) * 1.0 + tube_mode_f * dyn_postGain_ui;
+dyn_inScale_eff       = (1.0 - is_dyn_f) * 1.0 + is_dyn_f * dyn_inScale_ui;
+dyn_biasOffset_eff    = is_dyn_f * dyn_biasOffset_ui;
+dyn_tauF_eff          = (1.0 - is_dyn_f) * 3.0 + is_dyn_f * dyn_tauF_ui;
+dyn_tauS_eff          = (1.0 - is_dyn_f) * 80.0 + is_dyn_f * dyn_tauS_ui;
+dyn_kF_eff            = is_dyn_f * dyn_kF_ui;
+dyn_kS_eff            = is_dyn_f * dyn_kS_ui;
+dyn_kB_eff            = is_dyn_f * dyn_kB_ui;
+dyn_biasEnvEnable_eff = is_dyn_f * dyn_biasEnvEnable_ui;
+dyn_postGain_eff      = (1.0 - is_dyn_f) * 1.0 + is_dyn_f * dyn_postGain_ui;
 
 safeDrive = max(0.05, dyn_drive0_eff);
+
+// --- Preamp Monitoring (4 Junction Points) ---
+pk_decay = exp(-1.0 / (0.5 * ma.SR));
+p_hold = max ~ (*(pk_decay));
+
+mtr_hb1 = hbargraph("0 Preamp Monitoring/[0]Input[unit:dB]", -60, 10);
+mtr_hb2 = hbargraph("0 Preamp Monitoring/[1]Inter 1-2[unit:dB]", -60, 10);
+mtr_hb3 = hbargraph("0 Preamp Monitoring/[2]Inter 2-3[unit:dB]", -60, 10);
+mtr_hb4 = hbargraph("0 Preamp Monitoring/[3]Preamp Out[unit:dB]", -60, 10);
+
+m1(x) = x : attach(_, abs(x) : p_hold : ba.linear2db : mtr_hb1);
+m2(x) = x : attach(_, abs(x) : p_hold : ba.linear2db : mtr_hb2);
+m3(x) = x : attach(_, abs(x) : p_hold : ba.linear2db : mtr_hb3);
+m4(x) = x : attach(_, abs(x) : p_hold : ba.linear2db : mtr_hb4);
 
 // -----------------------------------------------------------------------------
 // Stage-specific helpers with grid current v2
@@ -501,7 +496,7 @@ stage1_or_dyn =
     _ <: (off_block, gc_block) 
       : (+, _) 
       <: (stage1_static_local, stage1_dynamic_local) 
-      : ba.selectn(2, tube_mode)
+      : ba.selectn(2, is_dyn)
 with {
     off_block = *(1.0 - grid1_enable);
     gc_block  = *(grid1_enable) : gridCurrentBiasBlock(grid1_vth, grid1_amtIn, grid1_amtBias, grid1_tau);
@@ -558,7 +553,7 @@ stage2_or_dyn =
     _ <: (off_block, gc_block) 
       : (+, _) 
       <: (stage2_static_local, stage2_dynamic_local) 
-      : ba.selectn(2, tube_mode)
+      : ba.selectn(2, is_dyn)
 with {
     off_block = *(1.0 - grid2_enable);
     gc_block  = *(grid2_enable) : gridCurrentBiasBlock(grid2_vth, grid2_amtIn, grid2_amtBias, grid2_tau);
@@ -594,7 +589,7 @@ stage3_or_dyn =
     _ <: (off_block, gc_block) 
       : (+, _) 
       <: (stage3_static_local, stage3_dynamic_local) 
-      : ba.selectn(2, tube_mode)
+      : ba.selectn(2, is_dyn)
 with {
     off_block = *(1.0 - grid3_enable);
     gc_block  = *(grid3_enable) : gridCurrentBiasBlock(grid3_vth, grid3_amtIn, grid3_amtBias, grid3_tau);
@@ -633,7 +628,7 @@ with {
 // Marshall=3, Fender Twin=2, Mesa=3, Vox=2, Peavey=3, Deluxe=2, Soldano=3, Orange=3
 preamp_stages_ui = hgroup(
     "2 Preamp",
-    nentry("Stages[stratus:1][style:menu{'1 stage':0;'2 stages':1;'3 stages':2}]", 1, 0, 2, 1)
+    nentry("Stages[style:menu{'1 stage':0;'2 stages':1;'3 stages':2}]", 1, 0, 2, 1)
 ) : int;
 //                    Custom             Marshall Fender  Mesa  Vox   Peavey  Deluxe Soldano Orange
 preamp_stages = (preamp_stages_ui, 2,       1,       2,    1,    2,     1,      2,     2) : ba.selectn(9, amp_preset);
@@ -667,10 +662,10 @@ preamp_level_comp = (1.00,   0.23,     1.27,   0.15,  1.16,  0.15,   1.00,   0.1
 // amp_preset drives this — when 0 (Custom), the UI sliders below are used
 filter_preset = amp_preset;
 
-hp12_ui = hgroup("2 Preamp/4 Interstage Filters", hslider("HPF 1-2 (Hz)[stratus:1]",  15.0,   5.0,  500.0,  1.0)) : si.smoo;
-lp12_ui = hgroup("2 Preamp/4 Interstage Filters", hslider("LPF 1-2 (Hz)[stratus:2]", 10000.0, 2000.0, 18000.0, 10.0)) : si.smoo;
-hp23_ui = hgroup("2 Preamp/4 Interstage Filters", hslider("HPF 2-3 (Hz)[stratus:3]",  20.0,   5.0,  500.0,  1.0)) : si.smoo;
-lp23_ui = hgroup("2 Preamp/4 Interstage Filters", hslider("LPF 2-3 (Hz)[stratus:4]",  8000.0, 2000.0, 18000.0, 10.0)) : si.smoo;
+hp12_ui = hgroup("2 Preamp/4 Interstage Filters", hslider("HPF 1-2 (Hz)]",  15.0,   5.0,  500.0,  1.0)) : si.smoo;
+lp12_ui = hgroup("2 Preamp/4 Interstage Filters", hslider("LPF 1-2 (Hz)]", 10000.0, 2000.0, 18000.0, 10.0)) : si.smoo;
+hp23_ui = hgroup("2 Preamp/4 Interstage Filters", hslider("HPF 2-3 (Hz)]",  20.0,   5.0,  500.0,  1.0)) : si.smoo;
+lp23_ui = hgroup("2 Preamp/4 Interstage Filters", hslider("LPF 2-3 (Hz)]",  8000.0, 2000.0, 18000.0, 10.0)) : si.smoo;
 
 // Index: 0        1         2        3        4        5        6        7        8
 hp12 = (hp12_ui, 60.0,    30.0,     10.0,    150.0,   120.0,   15.0,    80.0,    30.0)    : ba.selectn(9, filter_preset) : si.smoo;
@@ -682,64 +677,48 @@ interStage12 = fi.highpass(1, hp12) : fi.lowpass(1, lp12);
 interStage23 = fi.highpass(1, hp23)  : fi.lowpass(1, lp23);
 interstage_dc = fi.dcblocker;
 
-// preAmp1: 1 stage — last (and only) stage can be dynamic
-preAmp1 = *(input_vol) : stage1_or_dyn
-        : interstage_dc : *(preamp_out * preamp_level_comp);
-
-// preAmp2: 2 stages — stage1 always STATIC, stage2 (last) can be dynamic
-preAmp2 = *(input_vol) : stage1_static
-        : interstage_dc
-        : *(gk)
-        : interStage12
-        : stage2_or_dyn
-        : interstage_dc
-        : *(preamp_out * preamp_level_comp);
-
-// preAmp3: 3 stages — stage1 and stage2 always STATIC, stage3 (last) can be dynamic
-preAmp3 = *(input_vol) : stage1_static
-        : interstage_dc
-        : *(gk)
-        : interStage12
-        : stage2_static
-        : interstage_dc
-        : interStage23
-        : stage3_or_dyn
-        : interstage_dc
-        : *(preamp_out * preamp_level_comp);
+// Preamp sequential logic blocks
+s1_block = (_ <: stage1_static, stage1_or_dyn : select2(preamp_stages == 0)) : m2;
+s2_block = interstage_dc : *(gk) : interStage12 
+         : (_ <: stage2_static, stage2_or_dyn : select2(preamp_stages == 1)) : m3;
+s3_block = interstage_dc : interStage23 : stage3_or_dyn : m4;
 
 // -----------------------------------------------------------------------------
 // Post-Preamp Sculpting EQ (hi and lo cuts)
 // -----------------------------------------------------------------------------
-hc_en = 1 - hgroup("3 Post-Preamp EQ", checkbox("Bypass High Cut[stratus:0]"));
-lc_en = 1 - hgroup("3 Post-Preamp EQ", checkbox("Bypass Low Cut[stratus:4]"));
+hc_en = hgroup("3 Post-Preamp EQ", checkbox("High Cut]"));
+lc_en = hgroup("3 Post-Preamp EQ", checkbox("Low Cut]"));
 
 post_eq_group(x) = hgroup("3 Post-Preamp EQ", 
     x : (
         _ <: _, fi.peak_eq_cq(
-            hslider("High Cut Gain (dB)[stratus:1]", -25.0, -80.0, 20.0, 0.1) : si.smoo,
-            hslider("High Cut Freq (Hz)[stratus:2]", 10000.0, 1000.0, 20000.0, 10.0) : si.smoo,
-            hslider("High Cut Q[stratus:3]", 1.0, 0.1, 10.0, 0.01) : si.smoo
+            hslider("High Cut Gain (dB)]", -25.0, -80.0, 20.0, 0.1) : si.smoo,
+            hslider("High Cut Freq (Hz)]", 10000.0, 1000.0, 20000.0, 10.0) : si.smoo,
+            hslider("High Cut Q]", 1.0, 0.1, 10.0, 0.01) : si.smoo
         ) : select2(hc_en)
     ) :
     (
         _ <: _, fi.peak_eq_cq(
-            hslider("Low Cut Gain (dB)[stratus:5]", -19.0, -80.0, 20.0, 0.1) : si.smoo,
-            hslider("Low Cut Freq (Hz)[stratus:6]", 60.0, 10.0, 1000.0, 1.0) : si.smoo,
-            hslider("Low Cut Q[stratus:7]", 1.0, 0.1, 10.0, 0.01) : si.smoo
+            hslider("Low Cut Gain (dB)]", -19.0, -80.0, 20.0, 0.1) : si.smoo,
+            hslider("Low Cut Freq (Hz)]", 60.0, 10.0, 1000.0, 1.0) : si.smoo,
+            hslider("Low Cut Q]", 1.0, 0.1, 10.0, 0.01) : si.smoo
         ) : select2(lc_en)
     )
 );
 
-preAmpWet = _ <: preAmp1, preAmp2, preAmp3
-          : ba.selectn(3, preamp_stages)
+preAmpWet = _ * input_vol : m1
+          : s1_block
+          : ( _ <: _, s2_block : select2(preamp_stages > 0) ) 
+          : ( _ <: _, s3_block : select2(preamp_stages > 1) )
+          : interstage_dc : *(preamp_out * preamp_level_comp * gk_comp)
           : post_eq_group;
 
 // -----------------------------------------------------------------------------
 // Bypass
 // -----------------------------------------------------------------------------
-bypass_preamp   = hgroup("2 Preamp", checkbox("Bypass[stratus:2]"));
+bypass_preamp   = hgroup("2 Preamp", checkbox("Bypass"));
 bypass_preamp_f = float(bypass_preamp) : si.smoo;
-bypass_gain     = hgroup("2 Preamp", hslider("Bypass Gain[stratus:2][style:knob]", 8.0, 0.1, 20.0, 0.01)) : si.smoo;
+bypass_gain     = hgroup("2 Preamp", hslider("Bypass Gain[style:knob]", 8.0, 0.1, 20.0, 0.01)) : si.smoo;
 
 preAmpDry = _ * bypass_gain;
 

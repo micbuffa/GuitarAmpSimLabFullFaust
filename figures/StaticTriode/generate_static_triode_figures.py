@@ -57,16 +57,40 @@ def fig1_transfer_function():
     ax.set_title('(a) Varying Drive ($a$)\nIncreasing $a$ narrows the linear region')
     ax.legend()
 
-    # Right: varying 'b' (Bias/Operating Point)
+    # Right: varying 'b' (Bias/Operating Point) — Visualizing Asymmetry Break
     ax = axes[1]
-    a_fixed = 5.0
-    for b, color in zip([0.0, -0.1, -0.2, -0.4], COLORS):
-        y = triode_static(x, a_fixed, b)
-        ax.plot(x, y, color=color, label=f'$b = {b}$')
+    a_f = 4.0
+    b_val = -0.6 # Strong bias for visibility
+    x_range = np.linspace(-1.5, 1.5, 500)
+    
+    y_sym = np.tanh(a_f * x_range)
+    y_bi  = np.tanh(a_f * x_range + b_val)
+    
+    ax.plot(x_range, y_sym, 'k--', lw=1, alpha=0.3, label='Symmetric ($b=0$)')
+    ax.plot(x_range, y_bi, color=COLORS[1], lw=2, label=f'Biased ($b={b_val}$)')
+    
+    # Highlight the Operating Point
+    op_y = np.tanh(b_val)
+    ax.plot(0, op_y, 'ro', markersize=6, label='Operating Point')
+    
+    # Show Asymmetric Headroom for input range [-1, 1]
+    y_pos = np.tanh(a_f * 1.0 + b_val)
+    y_neg = np.tanh(a_f * -1.0 + b_val)
+    
+    ax.annotate('', xy=(1.0, y_pos), xytext=(1.0, op_y), arrowprops=dict(arrowstyle='<->', color='green', lw=1.5))
+    ax.text(1.05, (y_pos+op_y)/2, 'Pos. Headroom', rotation=90, va='center', color='green', fontsize=8)
+    
+    ax.annotate('', xy=(-1.0, y_neg), xytext=(-1.0, op_y), arrowprops=dict(arrowstyle='<->', color='blue', lw=1.5))
+    ax.text(-1.15, (y_neg+op_y)/2, 'Neg. Headroom', rotation=90, va='center', color='blue', fontsize=8)
+
+    ax.axhline(0, color='k', lw=0.5, ls='-')
+    ax.axvline(0, color='k', lw=0.5, ls='-')
+    
     ax.set_xlabel('Input $x$')
-    ax.set_ylabel('Output $y = \\tanh(a \\cdot x + b)$')
-    ax.set_title('(b) Varying Bias ($b$)\n$b \\neq 0$ introduces asymmetry')
-    ax.legend()
+    ax.set_ylabel('Output $y$')
+    ax.set_title('(b) Bias-Induced Asymmetry\nUnequal distance to saturation for $\\pm$ excursions')
+    ax.legend(loc='lower right', fontsize=8)
+    ax.set_xlim(-1.5, 1.5)
 
     fig.suptitle('Static Triode Model — Transfer Characteristics', fontweight='bold', y=1.02)
     fig.tight_layout()
@@ -76,36 +100,70 @@ def fig1_transfer_function():
     plt.close(fig)
 
 
-# ─── Figure 2: Waveform Distortion ───────────────────────────────────────────
+# ─── Figure 2: Waveform Distortion — The Symmetry Break ───────────────────────
 def fig2_waveform_distortion():
-    N = int(SR * 0.01)  # 10ms
+    N = int(SR * 0.005)  # 5ms window
     t_ms = np.arange(N) / SR * 1000
-    f = 200.0
-    x = np.sin(2*np.pi * f * np.arange(N)/SR)
+    f = 300.0
+    # Input sine: strong to force deep clipping
+    x = 2.0 * np.sin(2*np.pi * f * np.arange(N)/SR) 
 
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4.5))
+    fig, axes = plt.subplots(1, 2, figsize=(11, 5))
 
-    # Left: Symmetrical vs Asymmetrical (Clipping character)
+    # Left: Symmetry Mirror (Irreproachable evidence of asymmetry)
     ax = axes[0]
-    ax.plot(t_ms, x, 'k--', lw=1.0, alpha=0.5, label='Input sine')
-    y_sym = triode_static(x, 6.0, 0.0)
-    y_asym = triode_static(x, 6.0, -0.25)
-    ax.plot(t_ms, y_sym, color=COLORS[0], label='Symmetrical ($b=0$)')
-    ax.plot(t_ms, y_asym, color=COLORS[1], label='Asymmetrical ($b=-0.25$)')
-    ax.set_xlabel('Time [ms]')
-    ax.set_ylabel('Amplitude')
-    ax.set_title('(a) Symmetrical vs. Asymmetrical Clipping')
-    ax.legend(loc='upper right', fontsize=9)
+    # a=1.0, b=-1.1 with x=2.2 means:
+    # Top Peak u = 1(2.2) - 1.1 = 1.1 -> tanh(1.1) = 0.8 (Very soft/round)
+    # Bot Peak u = 1(-2.2) - 1.1 = -3.3 -> tanh(-3.3) = -0.997 (Rock flat)
+    a, b = 1.0, -1.1 
+    y = triode_static(x, a, b)
+    
+    h_cycle = int(0.5 * SR / f)
+    pos_segment = y[0:h_cycle]
+    neg_segment = y[h_cycle:2*h_cycle]
+    t_seg = t_ms[0:h_cycle]
+    
+    ax.plot(t_ms, y, color=COLORS[1], lw=2.5, label='Biased Output Signal', alpha=0.9)
+    
+    # THE MIRROR: Overlay inverted positive cycle on the negative cycle
+    ax.plot(t_seg + 1000/(2*f), -pos_segment, color=COLORS[0], lw=2.0, ls='--', 
+            label='Mirrored Positive Peak')
+    
+    # Shade the difference (The "Asymmetry Gap")
+    ax.fill_between(t_seg + 1000/(2*f), -pos_segment, neg_segment, color='purple', alpha=0.3, label='Asymmetry Gap')
 
-    # Right: Soft vs Hard onset (Drive effect)
-    ax = axes[1]
-    for a, color in zip([2, 5, 12], COLORS[2:]):
-        y = triode_static(x, a, 0)
-        ax.plot(t_ms, y, color=color, label=f'$a = {a}$')
+    ax.annotate('Soft "Breathing" Peak\n(Rounded top)', xy=(0.83, 0.78), xytext=(1.1, 1.1),
+                arrowprops=dict(arrowstyle='->', color='green', lw=1.5))
+    ax.annotate('Hard Compressed Peak\n(Flat plateau)', xy=(2.5, -0.99), xytext=(3.2, -1.25),
+                arrowprops=dict(arrowstyle='->', color='red', lw=1.5))
+
+    ax.set_ylim(-1.4, 1.4)
+    ax.axhline(0, color='k', lw=1.0)
     ax.set_xlabel('Time [ms]')
     ax.set_ylabel('Amplitude')
-    ax.set_title('(b) Progressive Saturation Enclosure')
-    ax.legend(loc='upper right', fontsize=9)
+    ax.set_title('(a) Contrast Analysis: Round vs. Flat Peaks\nTop peak is preserved; Bottom peak "hits the wall" early')
+    ax.legend(loc='lower left', fontsize=8)
+
+    # Right: Saturation Headroom Detail (Scaling fixed)
+    ax = axes[1]
+    zoom_n = int(0.0035 * SR)
+    t_z = np.arange(zoom_n) / SR * 1000
+    x_ref = 1.0 * np.sin(2*np.pi * f * (np.arange(zoom_n)/SR)) # Scaled down for framing
+    
+    y_z = triode_static(1.5 * x_ref, a, b) # High drive inner signal
+    
+    ax.plot(t_z, x_ref, 'k--', lw=1, alpha=0.4, label='Input Sine (Ref)')
+    ax.plot(t_z, y_z, color=COLORS[1], lw=2.0, label='Biased Output')
+    
+    # Shading the headroom imbalance
+    ax.fill_between(t_z, x_ref, y_z, where=(x_ref>y_z)&(x_ref>0), color='green', alpha=0.15, label='Soft Clipping')
+    ax.fill_between(t_z, x_ref, y_z, where=(y_z<x_ref)&(x_ref<0), color='red', alpha=0.25, label='Hard Clipping')
+    
+    ax.set_xlabel('Time [ms]')
+    ax.set_title('(b) Dynamic Compression Imbalance\nRed area: Instant saturation / Green: Soft rounding')
+    ax.legend(loc='lower right', fontsize=8)
+    ax.set_ylim(-1.4, 1.4)
+    ax.axhline(0, color='k', lw=0.5)
 
     fig.suptitle('Waveform Deformation — Non-linear Effects', fontweight='bold', y=1.01)
     fig.tight_layout()

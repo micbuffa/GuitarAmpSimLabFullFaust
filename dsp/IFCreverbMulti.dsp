@@ -25,10 +25,12 @@ algo = int(hgroup("6 Reverb", nentry("Type [style:menu{'Freeverb':0;'Spring':1;'
 // Defaults "guitare"
 // ------------------------------------------------------------
 
-// Freeverb : discrete, rather simple room/plate
+// Freeverb : optimized for guitar (HPF + Pre-delay)
 wetFree =
-    _ <: _,_
-    : re.stereo_freeverb(0.72, 0.50, 0.35, 23)
+    fi.highpass(1, 200)               // Clear the low-end mud
+    : de.delay(1024, 0.015 * ma.SR)   // 15ms pre-delay for transient clarity
+    <: _,_
+    : re.stereo_freeverb(0.8, 0.5, 0.5, 23) // Larger room, more damping (less metallic)
     : +
     : *(0.5 * mixReverb);
 

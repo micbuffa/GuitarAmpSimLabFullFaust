@@ -2,8 +2,11 @@ import("stdfaust.lib");
 import("IFCguitarixTubes.dsp");
 
 preampMB = *(inputVolume)
-    : chain
-    : *(gain)
+    : m1
+    : Stage1 : m2
+    : ( _ <: _, (*(preamp) : fi.lowpass(1,6531.0) : Stage2 : m3) : select2(nstages > 0) )
+    : ( _ <: _, (*(preamp) : fi.lowpass(1,6531.0) : Stage3) : select2(nstages > 1) )
+    : *(gain * gk_comp)
 with { 
     inputVolume = hgroup("Preamp Guitarix", hslider("Input Volume[style:knob]",-6,-20,20,0.1) : ba.db2linear : si.smooth(0.999));
     preamp = hgroup("Preamp Guitarix", hslider("Interstage gain[style:knob]",-6,-20,20,0.1) : ba.db2linear : si.smooth(0.999));
@@ -19,36 +22,26 @@ with {
     Stage2 = (tube_menu2, (_ <: T2_12AX7, T2_12AT7, T2_12AU7, T2_6V6, T2_6DJ8, T2_6C16)) : ba.selectn(6);
     Stage3 = (tube_menu3, (_ <: T3_12AX7, T3_12AT7, T3_12AU7, T3_6V6, T3_6DJ8, T3_6C16)) : ba.selectn(6);
 
-    // 3 chains de longueur croissante, sélectionnées par nstages
-    // Note : le  réseau RC de couplage inter-étage 
-    // est modélisé par le filtre fi.lowpass(1,6531.0)
-    // Plaque étage N
-    //  │
-    // [Cc]  ← condensateur de couplage (typiquement 22 nF)
-    //  │
-    // [Rg]  ← résistance de grille du tube suivant (typiquement 1 MΩ)
-    //  │
-    // étage N+1 (Grille)
-    // 
-    // Ce réseau forme un filtre passe-bas dont la fréquence de coupure est :
-    // fc = 1 / (2π × Cc × Rg)
-    //    = 1 / (2π × 22nF × 1MΩ)
-    //    = 7237 Hz
-    // 
-    // C'est cohérent avec le 6531 Hz utilisé dans le code. 
-    //  - Adoucit le mordant et le "spit" des hautes fréquences générées par 
-    //      la distorsion
-    //  - écrase l'extrême aigu avant que le signal n'entre dans l'étage suivant.
-    //  - Réduit l'aliasing potentiel transmis à l'étage suivant
-    //  - Colore le son : chaque étage voit un signal déjà "arrondi" dans 
-    //    l'aigu → la distorsion des étages 2 et 3 travaille sur un signal moins 
-    //    riche en harmoniques → saturation plus progressive et "musicale"
+    // --- VU Meters (horizontal, dB, peak-hold with 0.5s decay) ---
+    pk_decay = exp(-1.0 / (0.5 * ma.SR));
+    p_hold = max ~ (*(pk_decay));
 
-    chain1 = Stage1;
-    chain2 = Stage1 : *(preamp) : fi.lowpass(1,6531.0) : Stage2;
-    chain3 = Stage1 : *(preamp) : fi.lowpass(1,6531.0) : Stage2 : *(preamp) : fi.lowpass(1,6531.0) : Stage3;
+    mtr_hb1 = hbargraph("Preamp Guitarix/[0]Input[unit:dB]", -60, 10);
+    mtr_hb2 = hbargraph("Preamp Guitarix/[1]Inter 1-2[unit:dB]", -60, 10);
+    mtr_hb3 = hbargraph("Preamp Guitarix/[2]Output[unit:dB]", -60, 10);
 
-    chain = (nstages, (_ <: chain1, chain2, chain3)) : ba.selectn(3);
+    m1(x) = x : attach(_, abs(x) : p_hold : ba.linear2db : mtr_hb1);
+    m2(x) = x : attach(_, abs(x) : p_hold : ba.linear2db : mtr_hb2);
+    m3(x) = x : attach(_, abs(x) : p_hold : ba.linear2db : mtr_hb3);
+
+    // Dynamic interstage gain compensation (keeps output constant as 'preamp' changes)
+    // ref_linear = default interstage gain (-6 dB ≈ 0.501); calibration point for output gain
+    ref_linear = ba.db2linear(-6.0);
+    // Pure inverse proportionality is mathematically exact for the linear regime 
+    // (which simulation proved is where standard DI signals operate in the Guitarix wavetable).
+    gk_comp_ratio = ref_linear / max(0.001, preamp);
+    // Disable compensation for 1-stage mode (no interstage gain applied)
+    gk_comp = select2(nstages > 0, 1.0, gk_comp_ratio) : si.smooth(0.999);
 };
 
 preampMono = hgroup("Preamp Guitarix", ba.bypass_fade(ma.SR/10, checkbox("bypass"), preampMB));
