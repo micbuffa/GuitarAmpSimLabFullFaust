@@ -2,6 +2,7 @@
 //  WAM Host – index.js
 //  Audio source switching, device menus, gain + VU meters
 // ────────────────────────────────────────────────────────────
+import { FACTORY_PRESETS } from './presets.js';
 
 /* ── DOM refs ───────────────────────────────────────────── */
 const sourceSelect = document.getElementById('source-select');
@@ -28,6 +29,16 @@ const inputVuPeak = document.getElementById('input-vu-peak');
 const outputVuFill = document.getElementById('output-vu-fill');
 const outputVuPeak = document.getElementById('output-vu-peak');
 
+/* ── Preset DOM refs ────────────────────────────────────── */
+const presetSelect      = document.getElementById('preset-select');
+const btnSavePreset     = document.getElementById('btn-save-preset');
+const presetUpdateRow   = document.getElementById('preset-update-row');
+const btnUpdatePreset   = document.getElementById('btn-update-preset');
+const btnSaveasPreset   = document.getElementById('btn-saveas-preset');
+const btnDeletePreset   = document.getElementById('btn-delete-preset');
+const activePresetBadge = document.getElementById('active-preset-badge');
+const activePresetName  = document.getElementById('active-preset-name');
+
 /* ── State ──────────────────────────────────────────────── */
 let audioContext = null;
 let currentSource = null;
@@ -41,6 +52,11 @@ let inputGainNode = null;
 let outputGainNode = null;
 let inputAnalyser = null;
 let outputAnalyser = null;
+
+// Plugin instances (populated after init)
+let tunerInst = null, deathgateInst = null, autoWahInst = null,
+    ts9Inst = null, stonePhaserStereoInst = null, chorusInst = null,
+    ampInst = null, pingpongInst = null, greyholeInst = null;
 
 // Firefox helpers
 const isFirefox =
@@ -327,14 +343,214 @@ async function enumerateDevices() {
 navigator.mediaDevices.addEventListener(
     'devicechange',
     () => {
-
         enumerateDevices();
-
-        setStatus(
-            'Audio devices changed — lists refreshed'
-        );
+        setStatus('Audio devices changed — lists refreshed');
     }
 );
+
+/* ── 3. Preset Manager ─────────────────────────────────── */
+const PRESET_PREFIX = 'wam-host-preset:';
+let _activePreset = null;          // name of the active preset
+let _activePresetIsFactory = false; // true = factory preset (read-only)
+
+/**
+ * Dynamic plugin registry: key (string) → WAM instance.
+ * Populated after all plugins are instantiated.
+ * Adaptive: adding/removing plugins only requires updating this map.
+ */
+const _pluginRegistry = new Map();
+
+function _allPresetNames() {
+    const names = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(PRESET_PREFIX)) names.push(k.slice(PRESET_PREFIX.length));
+    }
+    return names.sort();
+}
+
+function _saveToStorage(name, state) {
+    localStorage.setItem(PRESET_PREFIX + name, JSON.stringify(state));
+}
+
+function _loadFromStorage(name) {
+    const raw = localStorage.getItem(PRESET_PREFIX + name);
+    return raw ? JSON.parse(raw) : null;
+}
+
+function _deleteFromStorage(name) {
+    localStorage.removeItem(PRESET_PREFIX + name);
+}
+
+/**
+ * Collect state from every registered plugin.
+ * New plugins (not yet in saved presets) are simply included.
+ */
+async function _collectState() {
+    const state = {};
+    for (const [key, inst] of _pluginRegistry) {
+        try {
+            state[key] = inst ? await inst.audioNode.getState() : null;
+        } catch (e) {
+            state[key] = null;
+            console.warn(`[Preset] getState failed for "${key}":`, e);
+        }
+    }
+    return state;
+}
+
+/**
+ * Apply saved state to registered plugins.
+ * - Plugin in registry but NOT in saved state → skipped (new plugin, keeps defaults).
+ * - Key in saved state but NOT in registry → silently ignored (removed plugin).
+ */
+async function _applyState(state) {
+    for (const [key, inst] of _pluginRegistry) {
+        if (!(key in state) || state[key] == null) {
+            console.log(`[Preset] No saved state for "${key}" — keeping defaults`);
+            continue;
+        }
+        try {
+            await inst.audioNode.setState(state[key]);
+        } catch (e) {
+            console.warn(`[Preset] setState failed for "${key}":`, e);
+        }
+    }
+}
+
+
+function _setActivePreset(name, isFactory = false) {
+    _activePreset = name;
+    _activePresetIsFactory = isFactory;
+
+    if (name) {
+        activePresetBadge.style.display = 'block';
+        activePresetName.textContent = name;
+        btnSavePreset.classList.add('hidden');
+        presetUpdateRow.classList.remove('hidden');
+
+        if (isFactory) {
+            // Factory preset: cannot update or delete
+            btnUpdatePreset.classList.add('hidden');
+            btnSaveasPreset.textContent = '+ Save as User Preset';
+            btnDeletePreset.classList.add('hidden');
+        } else {
+            // User preset: all actions available
+            btnUpdatePreset.classList.remove('hidden');
+            btnSaveasPreset.textContent = '+ New';
+            btnDeletePreset.classList.remove('hidden');
+        }
+    } else {
+        activePresetBadge.style.display = 'none';
+        activePresetName.textContent = '';
+        btnSavePreset.classList.remove('hidden');
+        presetUpdateRow.classList.add('hidden');
+        btnDeletePreset.classList.add('hidden');
+    }
+}
+
+function refreshPresetMenu() {
+    presetSelect.innerHTML = '';
+    presetSelect.add(new Option('\u2014 choose a preset \u2014', ''));
+
+    // ── Factory Presets group ──
+    const factoryGroup = document.createElement('optgroup');
+    factoryGroup.label = '\uD83C\uDFED Factory Presets';
+    FACTORY_PRESETS.forEach(p => {
+        factoryGroup.appendChild(new Option(p.name, 'factory:' + p.name));
+    });
+    presetSelect.appendChild(factoryGroup);
+
+    // ── User Presets group ──
+    const userNames = _allPresetNames();
+    if (userNames.length > 0) {
+        const userGroup = document.createElement('optgroup');
+        userGroup.label = '\uD83D\uDC64 My Presets';
+        userNames.forEach(n => userGroup.appendChild(new Option(n, 'user:' + n)));
+        presetSelect.appendChild(userGroup);
+    }
+
+    // Restore active selection
+    if (_activePreset) {
+        presetSelect.value = (_activePresetIsFactory ? 'factory:' : 'user:') + _activePreset;
+    }
+}
+
+/** Call once plugins are ready to unlock the preset UI */
+function enablePresetUI() {
+    refreshPresetMenu();
+    presetSelect.disabled    = false;
+    btnSavePreset.disabled   = false;
+    btnUpdatePreset.disabled = false;
+    btnSaveasPreset.disabled = false;
+    btnDeletePreset.disabled = false;
+}
+
+// ── Preset event handlers ─────────────────────────────────
+
+btnSavePreset.addEventListener('click', async () => {
+    const name = prompt('Preset name:');
+    if (!name || !name.trim()) return;
+    const trimmed = name.trim();
+    const state = await _collectState();
+    _saveToStorage(trimmed, state);
+    _setActivePreset(trimmed, false);
+    refreshPresetMenu();
+    setStatus(`\u2705 Preset "${trimmed}" saved`);
+});
+
+btnUpdatePreset.addEventListener('click', async () => {
+    if (!_activePreset || _activePresetIsFactory) return;
+    const state = await _collectState();
+    _saveToStorage(_activePreset, state);
+    setStatus(`\u2705 Preset "${_activePreset}" updated`);
+});
+
+btnSaveasPreset.addEventListener('click', async () => {
+    // Factory preset: suggest "Name (custom)"; user preset: suggest "Name copy"
+    const suggestion = _activePresetIsFactory
+        ? `${_activePreset} (custom)`
+        : (_activePreset ? `${_activePreset} copy` : '');
+    const name = prompt('New preset name:', suggestion);
+    if (!name || !name.trim()) return;
+    const trimmed = name.trim();
+    const state = await _collectState();
+    _saveToStorage(trimmed, state);
+    _setActivePreset(trimmed, false); // always a user preset
+    refreshPresetMenu();
+    setStatus(`\u2705 Preset "${trimmed}" saved`);
+});
+
+btnDeletePreset.addEventListener('click', () => {
+    if (!_activePreset || _activePresetIsFactory) return;
+    if (!confirm(`Delete preset "${_activePreset}"?`)) return;
+    _deleteFromStorage(_activePreset);
+    _setActivePreset(null);
+    refreshPresetMenu();
+    setStatus('\uD83D\uDDD1 Preset deleted');
+});
+
+presetSelect.addEventListener('change', async () => {
+    const val = presetSelect.value;
+    if (!val) { _setActivePreset(null); return; }
+
+    const isFactory = val.startsWith('factory:');
+    const name = val.slice(isFactory ? 8 : 5); // 'factory:'.length=8, 'user:'.length=5
+
+    let state;
+    if (isFactory) {
+        const found = FACTORY_PRESETS.find(p => p.name === name);
+        state = found ? found.state : null;
+    } else {
+        state = _loadFromStorage(name);
+    }
+
+    if (!state) { setStatus(`\u26A0\uFE0F Preset "${name}" not found`); return; }
+    setStatus(`Loading preset "${name}"\u2026`);
+    await _applyState(state);
+    _setActivePreset(name, isFactory);
+    setStatus(`\u2705 Preset "${name}" loaded`);
+});
 
 /* ── 3. Source switching ───────────────────────────────── */
 // Firefox workaround: hidden muted audio element to keep stream active
@@ -698,8 +914,8 @@ outputDeviceSelect.addEventListener(
         import('./plugins/greyhole/index.js')
     ]);
 
-    // Instantiate all plugins
-    const [
+    // Instantiate all plugins (assigned to module-level vars)
+    [
         tunerInst,
         deathgateInst,
         autoWahInst,
@@ -738,6 +954,19 @@ outputDeviceSelect.addEventListener(
 
     firstPluginInstance = tunerInst;
     wamInstance = ampInst;
+
+    // ── Populate the plugin registry (preset manager uses this) ──
+    // To add a new plugin: instantiate it, wire it into the audio graph,
+    // then add one line here.  Preset save/restore will pick it up automatically.
+    _pluginRegistry.set('tuner',       tunerInst);
+    _pluginRegistry.set('deathgate',   deathgateInst);
+    _pluginRegistry.set('autoWah',     autoWahInst);
+    _pluginRegistry.set('ts9',         ts9Inst);
+    _pluginRegistry.set('stonePhaser', stonePhaserStereoInst);
+    _pluginRegistry.set('chorus',      chorusInst);
+    _pluginRegistry.set('amp',         ampInst);
+    _pluginRegistry.set('pingpong',    pingpongInst);
+    _pluginRegistry.set('greyhole',    greyholeInst);
 
     // Create and mount GUIs
     const guis = await Promise.all([
@@ -872,6 +1101,9 @@ outputDeviceSelect.addEventListener(
 
     // Start VU meter animation
     vuLoop();
+
+    // Unlock preset UI now that all plugins are ready
+    enablePresetUI();
 
     setStatus('Ready — choose an audio source');
     // Resume AudioContext on any click anywhere on the page

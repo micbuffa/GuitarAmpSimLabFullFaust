@@ -251,6 +251,49 @@
             gap: 0.5rem;
         }
 
+        /* ── Preset panel ───────────────────────────────────── */
+        .preset-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+            margin-top: 0.5rem;
+        }
+
+        .preset-btn-row {
+            display: flex;
+            gap: 0.4rem;
+        }
+
+        .preset-btn-row button {
+            flex: 1;
+            font-size: 0.72rem;
+            padding: 0.4rem 0.5rem;
+        }
+
+        #active-preset-badge {
+            font-size: 0.68rem;
+            color: var(--accent);
+            margin-top: 0.35rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: none;
+        }
+
+        #active-preset-badge span {
+            font-weight: 600;
+        }
+
+        button.danger {
+            background: rgba(248, 113, 113, 0.12);
+            border-color: rgba(248, 113, 113, 0.3);
+            color: var(--red);
+        }
+
+        button.danger:hover {
+            background: rgba(248, 113, 113, 0.22);
+        }
+
         audio {
             width: 100%;
             height: 32px;
@@ -467,6 +510,32 @@
                 <span class="pulse"></span>
                 Live input active
             </span>
+        </div>
+        <!-- Preset Manager -->
+        <div class="panel" id="preset-panel">
+            <div class="panel-title">
+                <span class="dot" style="background:#38bdf8"></span>
+                Presets
+            </div>
+
+            <select id="preset-select" disabled>
+                <option value="">— no presets saved —</option>
+            </select>
+
+            <div class="preset-actions">
+                <!-- shown when no active preset -->
+                <button id="btn-save-preset" disabled>💾 Save Preset</button>
+
+                <!-- shown when an active preset is selected -->
+                <div class="preset-btn-row hidden" id="preset-update-row">
+                    <button id="btn-update-preset" disabled>↺ Update</button>
+                    <button id="btn-saveas-preset" disabled>+ New</button>
+                </div>
+
+                <button id="btn-delete-preset" class="danger hidden" disabled>🗑 Delete</button>
+            </div>
+
+            <div id="active-preset-badge">Active: <span id="active-preset-name"></span></div>
         </div>
     </aside>
 
