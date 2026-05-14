@@ -205,62 +205,62 @@ template.innerHTML = `
 					<div>GAIN</div>
 				</div>
 				<div class="knob-group">
-					<webaudio-knob id="knob-bass" diameter="60" min="0" max="1" step="0.01" value="0.5" tooltip="Bass: %d"></webaudio-knob>
+					<webaudio-knob id="knob-bass" diameter="60" min="0" max="10" step="0.1" value="5" tooltip="Bass: %.1f"></webaudio-knob>
 					<div>BASS</div>
 				</div>
 				<div class="knob-group">
-					<webaudio-knob id="knob-middle" diameter="60" min="0" max="1" step="0.01" value="0.3" tooltip="Middle: %d"></webaudio-knob>
+					<webaudio-knob id="knob-middle" diameter="60" min="0" max="10" step="0.1" value="3" tooltip="Middle: %.1f"></webaudio-knob>
 					<div>MIDDLE</div>
 				</div>
 				<div class="knob-group">
-					<webaudio-knob id="knob-treble" diameter="60" min="0" max="1" step="0.01" value="0.75" tooltip="Treble: %d"></webaudio-knob>
+					<webaudio-knob id="knob-treble" diameter="60" min="0" max="10" step="0.1" value="7.5" tooltip="Treble: %.1f"></webaudio-knob>
 					<div>TREBLE</div>
 				</div>
 				<div class="knob-group">
-					<webaudio-knob id="knob-reverb" diameter="60" min="0" max="1" step="0.001" value="0.597" tooltip="Reverb: %d"></webaudio-knob>
+					<webaudio-knob id="knob-reverb" diameter="60" min="0" max="10" step="0.1" value="5.97" tooltip="Reverb: %.1f"></webaudio-knob>
 					<div>REVERB</div>
 				</div>
 				<div class="knob-group">
-					<webaudio-knob id="knob-master" diameter="60" min="0" max="4" step="0.1" value="2.3" tooltip="Master: %d"></webaudio-knob>
+					<webaudio-knob id="knob-master" diameter="60" min="0" max="10" step="0.1" value="2.3" tooltip="Master: %.1f"></webaudio-knob>
 					<div>MASTER</div>
 				</div>
 				<div class="knob-group">
-					<webaudio-knob id="knob-presence" diameter="60" min="-15" max="15" step="0.1" value="0" tooltip="Presence: %d"></webaudio-knob>
+					<webaudio-knob id="knob-presence" diameter="60" min="0" max="10" step="0.1" value="6" tooltip="Presence: %.1f"></webaudio-knob>
 					<div>PRESENCE</div>
 				</div>
 			</div>
 
 			<div class="sliders-row">
 				<div class="slider-group">
-					<webaudio-slider id="slider-input" width="24" height="100" min="0" max="10" step="0.1" value="3.68" tooltip="Input: %d"></webaudio-slider>
+					<webaudio-slider id="slider-input" width="24" height="100" min="0" max="10" step="0.1" value="3.68" tooltip="Input: %.1f"></webaudio-slider>
 					<div>INPUT</div>
 				</div>
 				<div class="slider-group">
-					<webaudio-slider id="slider-gain" width="24" height="100" min="0" max="10" step="0.1" value="3.68" tooltip="Gain: %d"></webaudio-slider>
+					<webaudio-slider id="slider-gain" width="24" height="100" min="0" max="10" step="0.1" value="3.68" tooltip="Gain: %.1f"></webaudio-slider>
 					<div>GAIN</div>
 				</div>
 				<div class="slider-group">
-					<webaudio-slider id="slider-bass" width="24" height="100" min="0" max="1" step="0.01" value="0.5" tooltip="Bass: %d"></webaudio-slider>
+					<webaudio-slider id="slider-bass" width="24" height="100" min="0" max="10" step="0.1" value="5" tooltip="Bass: %.1f"></webaudio-slider>
 					<div>BASS</div>
 				</div>
 				<div class="slider-group">
-					<webaudio-slider id="slider-middle" width="24" height="100" min="0" max="1" step="0.01" value="0.3" tooltip="Middle: %d"></webaudio-slider>
+					<webaudio-slider id="slider-middle" width="24" height="100" min="0" max="10" step="0.1" value="3" tooltip="Middle: %.1f"></webaudio-slider>
 					<div>MIDDLE</div>
 				</div>
 				<div class="slider-group">
-					<webaudio-slider id="slider-treble" width="24" height="100" min="0" max="1" step="0.01" value="0.75" tooltip="Treble: %d"></webaudio-slider>
+					<webaudio-slider id="slider-treble" width="24" height="100" min="0" max="10" step="0.1" value="7.5" tooltip="Treble: %.1f"></webaudio-slider>
 					<div>TREBLE</div>
 				</div>
 				<div class="slider-group">
-					<webaudio-slider id="slider-reverb" width="24" height="100" min="0" max="1" step="0.001" value="0.597" tooltip="Reverb: %d"></webaudio-slider>
+					<webaudio-slider id="slider-reverb" width="24" height="100" min="0" max="10" step="0.1" value="5.97" tooltip="Reverb: %.1f"></webaudio-slider>
 					<div>REVERB</div>
 				</div>
 				<div class="slider-group">
-					<webaudio-slider id="slider-master" width="24" height="100" min="0" max="4" step="0.1" value="2.3" tooltip="Master: %d"></webaudio-slider>
+					<webaudio-slider id="slider-master" width="24" height="100" min="0" max="10" step="0.1" value="2.3" tooltip="Master: %.1f"></webaudio-slider>
 					<div>MASTER</div>
 				</div>
 				<div class="slider-group">
-					<webaudio-slider id="slider-presence" width="24" height="100" min="-15" max="15" step="0.1" value="0" tooltip="Presence: %d"></webaudio-slider>
+					<webaudio-slider id="slider-presence" width="24" height="100" min="0" max="10" step="0.1" value="6" tooltip="Presence: %.1f"></webaudio-slider>
 					<div>PRESENCE</div>
 				</div>
 			</div>
@@ -399,7 +399,29 @@ class EndUserAmpGui extends HTMLElement {
 			if (!el) continue;
 
 			const updateWam = (e) => {
-				const value = parseFloat(e.target.value);
+				let value = parseFloat(e.target.value);
+				
+				// Scale display values back to internal DSP ranges
+				// Robust matching using the element selector (ID)
+				const isEqOrReverb = selector.includes('bass') || selector.includes('middle') || selector.includes('treble') || selector.includes('reverb');
+				const isPresence = selector.includes('presence');
+				const isMaster = selector.includes('master');
+
+				if (isEqOrReverb) {
+					value = value / 10;
+				} else if (isPresence) {
+					// UI 0-10 -> DSP -15 to +10
+					value = (value * 2.5) - 15;
+					console.log(`[GUI] Presence UI -> DSP: ${e.target.value} -> ${value}`);
+				} else if (isMaster) {
+					// UI 0-10 -> DSP 0-4
+					value = value * 0.4;
+				}
+
+				if (selector.includes('reverb')) {
+					// console.log(`[GUI] Reverb UI -> DSP: ${e.target.value} -> ${value} (${address})`);
+				}
+
 				this._lastUserChange[address] = performance.now();
 				this.wamNode.setParamValue(address, value);
 			};
@@ -463,7 +485,25 @@ class EndUserAmpGui extends HTMLElement {
 		if (!el) return;
 
 		if (el.tagName === 'WEBAUDIO-KNOB' || el.tagName === 'WEBAUDIO-SLIDER') {
-			el.value = value;
+			let displayValue = value;
+			
+			// Scale internal DSP values back to display ranges (0-10)
+			// Robust matching using the selector from our paramMap
+			const isEqOrReverb = selector.includes('bass') || selector.includes('middle') || selector.includes('treble') || selector.includes('reverb');
+			const isPresence = selector.includes('presence');
+			const isMaster = selector.includes('master');
+
+			if (isEqOrReverb) {
+				displayValue = value * 10;
+			} else if (isPresence) {
+				// DSP -15 to +10 -> UI 0-10
+				displayValue = (value + 15) / 2.5;
+			} else if (isMaster) {
+				// DSP 0-4 -> UI 0-10
+				displayValue = value / 0.4;
+			}
+			
+			el.value = displayValue;
 		} else if (el.tagName === 'SELECT') {
 			el.value = Math.round(value).toString();
 		}
