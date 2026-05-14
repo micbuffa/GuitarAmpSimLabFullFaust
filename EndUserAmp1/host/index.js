@@ -3,6 +3,7 @@
 //  Audio source switching, device menus, gain + VU meters
 // ────────────────────────────────────────────────────────────
 import { FACTORY_PRESETS } from './presets.js';
+export { FACTORY_PRESETS };
 
 /* ── DOM refs ───────────────────────────────────────────── */
 const sourceSelect = document.getElementById('source-select');
@@ -349,7 +350,7 @@ navigator.mediaDevices.addEventListener(
 );
 
 /* ── 3. Preset Manager ─────────────────────────────────── */
-const PRESET_PREFIX = 'wam-host-preset:';
+export const PRESET_PREFIX = 'wam-host-preset:';
 let _activePreset = null;          // name of the active preset
 let _activePresetIsFactory = false; // true = factory preset (read-only)
 
@@ -358,9 +359,9 @@ let _activePresetIsFactory = false; // true = factory preset (read-only)
  * Populated after all plugins are instantiated.
  * Adaptive: adding/removing plugins only requires updating this map.
  */
-const _pluginRegistry = new Map();
+export const _pluginRegistry = new Map();
 
-function _allPresetNames() {
+export function _allPresetNames() {
     const names = [];
     for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
@@ -449,7 +450,29 @@ function _setActivePreset(name, isFactory = false) {
     }
 }
 
-function refreshPresetMenu() {
+export async function loadPreset(name, isFactory) {
+    let state;
+    if (isFactory) {
+        const found = FACTORY_PRESETS.find(p => p.name === name);
+        state = found ? found.state : null;
+    } else {
+        state = _loadFromStorage(name);
+    }
+
+    if (!state) { 
+        setStatus(`\u26A0\uFE0F Preset "${name}" not found`); 
+        return false; 
+    }
+    
+    setStatus(`Loading preset "${name}"\u2026`);
+    await _applyState(state);
+    _setActivePreset(name, isFactory);
+    refreshPresetMenu();
+    setStatus(`\u2705 Preset "${name}" loaded`);
+    return true;
+}
+
+export function refreshPresetMenu() {
     presetSelect.innerHTML = '';
     presetSelect.add(new Option('\u2014 choose a preset \u2014', ''));
 
@@ -475,6 +498,7 @@ function refreshPresetMenu() {
         presetSelect.value = (_activePresetIsFactory ? 'factory:' : 'user:') + _activePreset;
     }
 }
+
 
 /** Call once plugins are ready to unlock the preset UI */
 function enablePresetUI() {
@@ -537,20 +561,9 @@ presetSelect.addEventListener('change', async () => {
     const isFactory = val.startsWith('factory:');
     const name = val.slice(isFactory ? 8 : 5); // 'factory:'.length=8, 'user:'.length=5
 
-    let state;
-    if (isFactory) {
-        const found = FACTORY_PRESETS.find(p => p.name === name);
-        state = found ? found.state : null;
-    } else {
-        state = _loadFromStorage(name);
-    }
-
-    if (!state) { setStatus(`\u26A0\uFE0F Preset "${name}" not found`); return; }
-    setStatus(`Loading preset "${name}"\u2026`);
-    await _applyState(state);
-    _setActivePreset(name, isFactory);
-    setStatus(`\u2705 Preset "${name}" loaded`);
+    await loadPreset(name, isFactory);
 });
+
 
 /* ── 3. Source switching ───────────────────────────────── */
 // Firefox workaround: hidden muted audio element to keep stream active
@@ -1036,45 +1049,6 @@ outputDeviceSelect.addEventListener(
         pedalIndices.forEach(i => scalePlugin(guis[i], 180)); // pédales à 180 px
     });
 
-    // Robust bypass helper using WAM-standard methods with retry logic
-    const setPluginBypass = async (inst, bypassed) => {
-        let info = null;
-        for (let i = 0; i < 5; i++) {
-            try {
-                info = await inst.audioNode.getParameterInfo();
-                if (info && Object.keys(info).length > 0) break;
-            } catch (e) { }
-            await new Promise(r => setTimeout(r, 200));
-        }
-
-        if (!info) {
-            console.warn(`[Host] Could not get parameters for ${inst.descriptor?.name}. Skipping bypass.`);
-            return;
-        }
-
-        const pIds = Object.keys(info);
-        const bypassParam = pIds.find(p =>
-            p.toLowerCase().endsWith('/bypass') ||
-            p.toLowerCase() === 'enabled' ||
-            p.toLowerCase() === 'bypass'
-        );
-
-        if (bypassParam) {
-            const isEnabledStyle = bypassParam.toLowerCase().includes('enabled');
-            const val = isEnabledStyle ? (bypassed ? 0 : 1) : (bypassed ? 1 : 0);
-
-            try {
-                await inst.audioNode.setParameterValues({
-                    [bypassParam]: { id: bypassParam, value: val, normalized: false }
-                });
-                console.log(`[Host] ${inst.descriptor.name}: set ${bypassParam} to ${val} (${bypassed ? 'Bypassed' : 'Active'})`);
-            } catch (e) {
-                console.error(`[Host] Error setting ${bypassParam} for ${inst.descriptor.name}`, e);
-            }
-        } else {
-            console.log(`[Host] No bypass param found for ${inst.descriptor.name}. Params:`, pIds.slice(0, 5));
-        }
-    };
 
     // Turn off effects (bypass) using standard WAM API AFTER GUIs are created
     setTimeout(async () => {
@@ -1119,3 +1093,48 @@ outputDeviceSelect.addEventListener(
         await switchSource();
     }
 })();
+
+// MIDI Controller access
+export function getAmpInstance() { return ampInst; }
+
+
+// ── Robust bypass helper using WAM-standard methods with retry logic ──
+export async function setPluginBypass(inst, bypassed) {
+    if (!inst || !inst.audioNode) return;
+    
+    let info = null;
+    for (let i = 0; i < 5; i++) {
+        try {
+            info = await inst.audioNode.getParameterInfo();
+            if (info && Object.keys(info).length > 0) break;
+        } catch (e) { }
+        await new Promise(r => setTimeout(r, 200));
+    }
+
+    if (!info) {
+        console.warn(`[Host] Could not get parameters for ${inst.descriptor?.name}. Skipping bypass.`);
+        return;
+    }
+
+    const pIds = Object.keys(info);
+    const bypassParam = pIds.find(p =>
+        p.toLowerCase().endsWith('/bypass') ||
+        p.toLowerCase() === 'enabled' ||
+        p.toLowerCase() === 'bypass' ||
+        p.toLowerCase() === 'active'
+    );
+
+    if (bypassParam) {
+        const isEnabledStyle = bypassParam.toLowerCase().includes('enabled') || bypassParam.toLowerCase() === 'active';
+        const val = isEnabledStyle ? (bypassed ? 0 : 1) : (bypassed ? 1 : 0);
+
+        try {
+            await inst.audioNode.setParameterValues({
+                [bypassParam]: { id: bypassParam, value: val, normalized: false }
+            });
+            console.log(`[Host] ${inst.descriptor?.name || 'Plugin'}: set ${bypassParam} to ${val} (${bypassed ? 'Bypassed' : 'Active'})`);
+        } catch (e) {
+            console.error(`[Host] Error setting ${bypassParam}`, e);
+        }
+    }
+}

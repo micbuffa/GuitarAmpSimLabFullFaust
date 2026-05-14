@@ -259,6 +259,175 @@
             margin-top: 0.5rem;
         }
 
+        /* ── MIDI panel ─────────────────────────────────────── */
+        #btn-midi-config {
+            margin-top: 0.5rem;
+            background: rgba(167, 139, 250, 0.1);
+            border-color: rgba(167, 139, 250, 0.3);
+            color: var(--accent);
+        }
+
+        #btn-midi-config:hover {
+            background: rgba(167, 139, 250, 0.2);
+        }
+
+        /* ── MIDI Panel (replaces modal) ────────────────────── */
+        #midi-panel {
+            position: fixed;
+            top: 0; 
+            right: -450px; /* Hidden by default */
+            width: 450px;
+            height: 100vh;
+            background: var(--bg-sidebar);
+            border-left: 1px solid var(--border);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+            transition: right 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        #midi-panel.open {
+            right: 0;
+        }
+
+        /* Adjust main area when MIDI is open */
+        body.midi-open #main-area {
+            margin-right: 450px;
+        }
+
+        #main-area {
+            transition: margin-right 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .midi-content {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .midi-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255,255,255,0.02);
+        }
+
+        .midi-header h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+
+        .close-modal {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .midi-section {
+            margin-bottom: 2rem;
+        }
+
+        .midi-section h3 {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-dim);
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .midi-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.6rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+
+        .midi-row:last-child { border: none; }
+
+        .midi-label {
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .midi-mapping {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .mapping-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--accent);
+            background: rgba(167, 139, 250, 0.1);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .btn-learn {
+            padding: 0.3rem 0.8rem;
+            font-size: 0.7rem;
+            width: auto;
+            min-width: 70px;
+        }
+
+        .btn-learn.active {
+            background: var(--accent);
+            color: #000;
+            animation: blink 1s infinite;
+        }
+
+        .btn-clear {
+            padding: 0.3rem;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(248, 113, 113, 0.1);
+            color: var(--red);
+            border-color: rgba(248, 113, 113, 0.2);
+            font-size: 0.9rem;
+            flex-shrink: 0;
+        }
+
+        .btn-clear:hover {
+            background: rgba(248, 113, 113, 0.2);
+            border-color: var(--red);
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
         .preset-btn-row {
             display: flex;
             gap: 0.4rem;
@@ -536,8 +705,61 @@
             </div>
 
             <div id="active-preset-badge">Active: <span id="active-preset-name"></span></div>
+
+            <!-- Sidebar MIDI Quick Select -->
+            <div id="sidebar-midi-panel" class="panel hidden" style="margin-top: 0.5rem; padding: 0.6rem 0.8rem;">
+                <div class="panel-title" style="margin-bottom: 0.4rem;">
+                    <span class="dot" style="background:var(--accent)"></span>
+                    MIDI Control
+                </div>
+                <select id="sidebar-midi-device-select" style="font-size: 0.72rem; padding: 0.35rem 0.5rem;">
+                    <option value="">— select device —</option>
+                </select>
+            </div>
+
+            <button id="btn-midi-config">🎹 Config MIDI Controller</button>
         </div>
     </aside>
+
+    <!-- MIDI Side Panel -->
+    <div id="midi-panel">
+        <div class="midi-content">
+            <div class="midi-header">
+                <h2>🎹 MIDI Mapping</h2>
+                <button class="close-modal" id="btn-close-midi">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="midi-section">
+                    <h3>MIDI Input Device</h3>
+                    <select id="midi-device-select">
+                        <option value="">— select MIDI device —</option>
+                    </select>
+                </div>
+
+                <div class="midi-section">
+                    <h3>Amplifier Controls</h3>
+                    <div id="midi-amp-controls">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+
+                <div class="midi-section">
+                    <h3>Plugins Bypass</h3>
+                    <div id="midi-plugin-controls">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+
+                <div class="midi-section">
+                    <h3>Preset Selection</h3>
+                    <div id="midi-preset-controls">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 
     <!-- ── Main area (plugins) ───────────────────────────── -->
     <div id="main-area">
@@ -550,5 +772,6 @@
     </div>
 
     <script type="module" src="index.js"></script>
+    <script type="module" src="midi_controller.js"></script>
 </body>
 </html>

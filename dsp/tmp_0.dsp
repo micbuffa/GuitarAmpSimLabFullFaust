@@ -6,23 +6,16 @@ preampMB = *(inputVolume)
     : Stage1 : m2
     : ( _ <: _, (*(preamp) : fi.lowpass(1,6531.0) : Stage2) : select2(nstages > 0) )
     : ( _ <: _, (*(preamp) : fi.lowpass(1,6531.0) : Stage3) : select2(nstages > 1) )
-    : m3_4
     : ( _ <: _, (*(preamp) : fi.highpass(1,100.0) : fi.lowpass(1,6531.0) : Stage4) : select2(nstages > 2) )
-    : m4_5
     : ( _ <: _, (*(preamp) : fi.highpass(1,100.0) : fi.lowpass(1,6531.0) : Stage5) : select2(nstages > 3) )
     : *(gain * gk_comp * stage_comp_gain)
     : m_out
 with { 
-    // Real Mesa Boogie amps use Audio Taper (logarithmic) potentiometers graded 0 to 10.
-    // We simulate this with a cubic curve. To match the old [-20, 20] dB range (which had a max multiplier of 10.0),
-    // we multiply by 10.0. So 10/10 -> x10.0 (+20dB), 5/10 -> x1.25 (+2dB).
-    audio_taper(x) = pow(x/10.0, 3.0) * 10.0;
-    
-    inputVolume = hgroup("Preamp Guitarix", hslider("Input Volume[style:knob]", 3.68, 0.0, 10.0, 0.1) : audio_taper : si.smooth(0.999));
-    preamp = hgroup("Preamp Guitarix", hslider("Interstage gain[style:knob]", 3.68, 0.0, 10.0, 0.1) : audio_taper : si.smooth(0.999));
-    gain  = hgroup("Preamp Guitarix", hslider("Output gain[style:knob]", 6.07, 0.0, 10.0, 0.1) : audio_taper : si.smooth(0.999));
+    inputVolume = hgroup("Preamp Guitarix", hslider("Input Volume[style:knob]",-6,-20,20,0.1) : ba.db2linear : si.smooth(0.999));
+    preamp = hgroup("Preamp Guitarix", hslider("Interstage gain[style:knob]",-6,-20,20,0.1) : ba.db2linear : si.smooth(0.999));
+    gain  = hgroup("Preamp Guitarix", hslider("Output gain[style:knob]", 7, -20.0, 20.0, 0.1) : ba.db2linear : si.smooth(0.999));
 
-    nstages = hgroup("Preamp Guitarix", nentry("Nb Stages[style:menu{'1 stage':0;'2 stages':1;'3 stages':2;'4 stages':3;'5 stages':4}]", 2, 0, 4, 1));
+    nstages = 0;
 
     tube_menu1 = hgroup("Preamp Guitarix", nentry("Stage 1 Tube[style:menu{'12AX7':0;'12AT7':1;'12AU7':2;'6V6':3;'6DJ8':4;'6C16':5}]", 0, 0, 5, 1));
     tube_menu2 = hgroup("Preamp Guitarix", nentry("Stage 2 Tube[style:menu{'12AX7':0;'12AT7':1;'12AU7':2;'6V6':3;'6DJ8':4;'6C16':5}]", 0, 0, 5, 1));
@@ -42,34 +35,29 @@ with {
 
     mtr_hb1 = hbargraph("Preamp Guitarix/[0]Input[unit:dB]", -60, 10);
     mtr_hb2 = hbargraph("Preamp Guitarix/[1]Inter 1-2[unit:dB]", -60, 10);
-    mtr_hb3_4 = hbargraph("Preamp Guitarix/[2]Inter 3-4[unit:dB]", -60, 10);
-    mtr_hb4_5 = hbargraph("Preamp Guitarix/[3]Inter 4-5[unit:dB]", -60, 10);
-    mtr_hb_out = hbargraph("Preamp Guitarix/[4]Output[unit:dB]", -60, 10);
+    mtr_hb3 = hbargraph("Preamp Guitarix/[2]Output[unit:dB]", -60, 10);
 
     m1(x) = x : attach(_, abs(x) : p_hold : ba.linear2db : mtr_hb1);
     m2(x) = x : attach(_, abs(x) : p_hold : ba.linear2db : mtr_hb2);
-    m3_4(x) = x : attach(_, abs(x) : p_hold : ba.linear2db : mtr_hb3_4);
-    m4_5(x) = x : attach(_, abs(x) : p_hold : ba.linear2db : mtr_hb4_5);
-    m_out(x) = x : attach(_, abs(x) : p_hold : ba.linear2db : mtr_hb_out);
+    m_out(x) = x : attach(_, abs(x) : p_hold : ba.linear2db : mtr_hb3);
 
     // Dynamic interstage gain compensation (keeps output constant as 'preamp' changes)
-    // The previous default linear value was -6dB (≈0.501), matching audio_taper(3.68).
-    ref_linear = audio_taper(3.68);
+    // ref_linear = default interstage gain (-6 dB ≈ 0.501); calibration point for output gain
+    ref_linear = ba.db2linear(-6.0);
+    // Pure inverse proportionality is mathematically exact for the linear regime 
+    // (which simulation proved is where standard DI signals operate in the Guitarix wavetable).
     gk_comp_ratio = ref_linear / max(0.001, preamp);
-    // When using multiple stages, the interstage gain is multiplied N times (nstages = number of extra stages).
-    // Compensate specifically for the number of active interstage multipliers to prevent loud saturation.
-    // Because tubes compress the signal, a full compensation pow(gk_comp_ratio, nstages) overcompensates (drops volume).
-    // An empirical exponent of ~0.6 * nstages provides a stable perceived volume when gain is cranked.
-    gk_comp = pow(gk_comp_ratio, float(nstages) * 0.6) : si.smooth(0.999);
+    // Disable compensation for 1-stage mode (no interstage gain applied)
+    gk_comp = select2(nstages > 0, 1.0, gk_comp_ratio) : si.smooth(0.999);
     
     // Output gain recalibration to maintain same output level regardless of number of active stages
     // 1 stage, 2 stages, 3 stages, 4 stages, 5 stages
-    stage_comp_gain = ba.selectn(5, nstages, (1.0, 1.5245, 2.2792, 3.4972, 3.5)) : si.smooth(0.999);
+    stage_comp_gain = ba.selectn(5, nstages, (1.0, 1.0, 1.0, 1.0, 1.0)) : si.smooth(0.999);
 };
 
 preampMono = hgroup("Preamp Guitarix", ba.bypass_fade(ma.SR/10, checkbox("bypass"), preampMB));
 
 preAmp = preampMono;
-//process = preAmp;
+process = preAmp;
 
  
