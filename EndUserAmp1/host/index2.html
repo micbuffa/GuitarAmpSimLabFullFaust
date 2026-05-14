@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>100% FAUST tube guitar amp 1</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --accent: #38bdf8;
+            --accent-hover: #0ea5e9;
+            --text: #f8fafc;
+            --text-dim: #94a3b8;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1500px;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin: 0;
+            background: linear-gradient(to right, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-bar {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 0.5rem 1rem;
+            border-radius: 999px;
+            font-size: 0.875rem;
+            color: var(--text-dim);
+            display: inline-block;
+            margin-top: 0.5rem;
+        }
+
+        .controls {
+            background: var(--card);
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2rem;
+            align-items: center;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            flex: 1;
+            min-width: 200px;
+            position: relative; /* For absolute warning */
+        }
+
+        label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-dim);
+        }
+
+        .warning {
+            color: #fbbf24;
+            font-size: 0.7rem;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            white-space: nowrap;
+            margin-top: 4px;
+            display: none;
+        }
+
+        select {
+            background: #0f172a;
+            color: white;
+            border: 1px solid #334155;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            outline: none;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        select:focus {
+            border-color: var(--accent);
+        }
+
+        button {
+            background: var(--accent);
+            color: #0f172a;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 1.25rem;
+            white-space: nowrap;
+        }
+
+        button:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.active {
+            background: #22c55e;
+            color: white;
+        }
+
+        #plugin-mount {
+            width: 100%;
+            display: flex;
+            flex-direction: row;
+            justify-content: flex-start;
+            align-items: stretch;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2rem;
+            border-radius: 1rem;
+            min-height: 400px;
+            position: relative;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            gap: 20px;
+            box-sizing: border-box;
+        }
+
+        .main-column {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            flex: 1;
+            background: var(--card);
+            padding: 2rem;
+            border-radius: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .amp-row {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 30px;
+            width: auto;
+            justify-content: center;
+        }
+
+        .effects-row {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            width: 100%;
+        }
+
+        .pedal-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            border-radius: 0.5rem;
+        }
+
+        #plugin-mount:empty::after {
+            content: "Plugin UI will appear here after clicking Start";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: var(--text-dim);
+            font-style: italic;
+        }
+
+        .vu-container {
+            flex: 0 0 60px;
+            height: 100px;
+            background: #0f172a;
+            border-radius: 0.5rem;
+            position: relative;
+            overflow: hidden;
+            margin-top: 1.25rem;
+            border: 1px solid #334155;
+        }
+
+        #vu-meter {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            background: linear-gradient(to top, #22c55e, #eab308, #ef4444);
+            height: 0%;
+            transition: height 0.05s linear;
+        }
+
+        .warning {
+            color: #fbbf24;
+            font-size: 0.75rem;
+            margin-top: 0.5rem;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>100% FAUST tube guitar amp 1</h1>
+            <div class="status-bar" id="status">Waiting for user interaction...</div>
+        </header>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="device-select">Input Device</label>
+                <select id="device-select">
+                    <option>Grant microphone access first...</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="output-select">Output Device</label>
+                <select id="output-select">
+                    <option value="">Default Output</option>
+                </select>
+                <div id="output-warning" class="warning">
+                    ⚠️ Output switching unsupported
+                </div>
+            </div>
+            <button id="start-btn">Initialize & Start Mic</button>
+            <div class="vu-container">
+                <div id="vu-meter"></div>
+            </div>
+        </div>
+
+        <div id="plugin-mount"></div>
+    </div>
+
+    <script type="module">
+        import { initializeWamHost } from '../sdk/index.js';
+        import WAM from '../index.js';
+        import Tuner from './plugins/tuner_machine/src/index.js';
+
+        const deviceSelect = document.getElementById('device-select');
+        const outputSelect = document.getElementById('output-select');
+        const outputWarning = document.getElementById('output-warning');
+        const startBtn = document.getElementById('start-btn');
+        const mount = document.getElementById('plugin-mount');
+        const status = document.getElementById('status');
+        const vuMeter = document.getElementById('vu-meter');
+
+        let audioContext;
+        let wamInstance;
+        let tunerInstance, deathgateInstance, autowahInstance, ts9Instance, phaserInstance, chorusInstance, pingpongInstance, greyholeInstance;
+        let currentSource;
+        let analyser;
+        let dataArray;
+        let keepAliveNode;
+        let selectedSinkId = '';
+
+        const pluginPaths = {
+            tuner: './plugins/tuner_machine/src/index.js',
+            deathgate: './plugins/deathgate/index.js',
+            autowah: './plugins/AutoWahMB/index.js',
+            ts9: './plugins/TS9_OverdriveFaustGenerated/index.js',
+            phaser: './plugins/StonePhaserStereo/index.js',
+            chorus: './plugins/WAMChorusMB/index.js',
+            amp: '../index.js',
+            pingpong: 'https://mainline.i3s.unice.fr/wam2/packages/faustPingPongDelay/plugin/index.js',
+            greyhole: './plugins/greyhole/index.js'
+        };
+
+        async function updateDevices() {
+            try {
+                status.textContent = "Requesting mic permission...";
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const inputs = devices.filter(d => d.kind === 'audioinput');
+                
+                deviceSelect.innerHTML = inputs.map(d => 
+                    `<option value="${d.deviceId}">${d.label || 'Mic ' + d.deviceId.slice(0,4)}</option>`
+                ).join('');
+
+                // Outputs
+                const outputs = devices.filter(d => d.kind === 'audiooutput');
+                outputSelect.innerHTML = outputs.map(d => 
+                    `<option value="${d.deviceId}">${d.label || 'Output ' + d.deviceId.slice(0,4)}</option>`
+                ).join('');
+                
+                status.textContent = `Found ${inputs.length} inputs and ${outputs.length} outputs.`;
+            } catch (err) {
+                status.textContent = "Permission denied or error: " + err.message;
+            }
+        }
+
+        async function initAudio() {
+            try {
+                status.textContent = "Initializing AudioContext...";
+                audioContext = new AudioContext();
+                
+                // FEATURE DETECTION: Apply output ONLY if supported
+                if (typeof audioContext.setSinkId === 'function') {
+                    if (selectedSinkId) {
+                        await audioContext.setSinkId(selectedSinkId);
+                    }
+                } else {
+                    outputSelect.disabled = true;
+                    outputWarning.style.display = 'block';
+                }
+
+                // Firefox workaround: Keep-alive ScriptProcessor
+                keepAliveNode = audioContext.createScriptProcessor(1024, 1, 1);
+                keepAliveNode.onaudioprocess = () => {
+                    if (audioContext && audioContext.state === 'suspended') {
+                        audioContext.resume();
+                    }
+                }; 
+                keepAliveNode.connect(audioContext.destination);
+
+                status.textContent = "Loading WAM Host...";
+                const [hostGroupId] = await initializeWamHost(audioContext);
+                
+                status.textContent = "Instantiating Plugins...";
+                const instances = await Promise.all([
+                    (await import(pluginPaths.tuner)).default.createInstance(hostGroupId, audioContext),
+                    (await import(pluginPaths.deathgate)).default.createInstance(hostGroupId, audioContext),
+                    (await import(pluginPaths.autowah)).default.createInstance(hostGroupId, audioContext),
+                    (await import(pluginPaths.ts9)).default.createInstance(hostGroupId, audioContext),
+                    (await import(pluginPaths.phaser)).default.createInstance(hostGroupId, audioContext),
+                    (await import(pluginPaths.chorus)).default.createInstance(hostGroupId, audioContext),
+                    (await import(pluginPaths.amp)).default.createInstance(hostGroupId, audioContext),
+                    (await import(pluginPaths.pingpong)).default.createInstance(hostGroupId, audioContext),
+                    (await import(pluginPaths.greyhole)).default.createInstance(hostGroupId, audioContext)
+                ]);
+
+                [tunerInstance, deathgateInstance, autowahInstance, ts9Instance, phaserInstance, chorusInstance, wamInstance, pingpongInstance, greyholeInstance] = instances;
+                
+                status.textContent = "Creating GUIs...";
+                const guis = await Promise.all(instances.map(inst => inst.createGui()));
+                const [tunerGui, gateGui, autowahGui, ts9Gui, phaserGui, chorusGui, ampGui, pingpongGui, greyholeGui] = guis;
+
+                mount.innerHTML = '';
+                
+                // Main Column for everything
+                const mainCol = document.createElement('div');
+                mainCol.className = 'main-column';
+                
+                // Top row with Tuner and Amp
+                const ampRow = document.createElement('div');
+                ampRow.className = 'amp-row';
+                
+                const tunerWrap = document.createElement('div');
+                tunerWrap.className = 'pedal-wrapper';
+                tunerWrap.appendChild(tunerGui);
+                ampRow.appendChild(tunerWrap);
+                
+                ampRow.appendChild(ampGui);
+                mainCol.appendChild(ampRow);
+
+                // Effects row below
+                const effectsRow = document.createElement('div');
+                effectsRow.className = 'effects-row';
+                effectsRow.style.justifyContent = 'center';
+                
+                const bottomPedals = [gateGui, autowahGui, ts9Gui, phaserGui, chorusGui, pingpongGui, greyholeGui];
+                bottomPedals.forEach(gui => {
+                    const wrap = document.createElement('div');
+                    wrap.className = 'pedal-wrapper';
+                    wrap.appendChild(gui);
+                    effectsRow.appendChild(wrap);
+                });
+                
+                mainCol.appendChild(effectsRow);
+                mount.appendChild(mainCol);
+
+                // Harmonize heights
+                requestAnimationFrame(() => {
+                    const ampHeight = ampGui.getBoundingClientRect().height || 450;
+                    scalePlugin(tunerGui, ampHeight);
+                    
+                    bottomPedals.forEach(gui => scalePlugin(gui, 180));
+                });
+
+                // Initial states
+                await Promise.all([
+                    setPluginBypass(tunerInstance, true),
+                    setPluginBypass(autowahInstance, true),
+                    setPluginBypass(ts9Instance, true),
+                    setPluginBypass(phaserInstance, true),
+                    setPluginBypass(chorusInstance, true),
+                    setPluginBypass(pingpongInstance, true),
+                    setPluginBypass(greyholeInstance, true),
+                    setPluginBypass(deathgateInstance, false)
+                ]);
+
+                try {
+                    await deathgateInstance.audioNode.setParameterValues({
+                        "/deathgate/NoiseGate": { id: "/deathgate/NoiseGate", value: -120, normalized: false }
+                    });
+                } catch(e) {}
+
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+                requestAnimationFrame(vuLoop);
+                status.textContent = "WAM Initialized.";
+            } catch (e) {
+                status.textContent = "Init error: " + e.message;
+                throw e;
+            }
+        }
+
+        function scalePlugin(gui, targetHeight) {
+            // Give a moment for the Faust UI to render its internal components
+            setTimeout(() => {
+                const currentHeight = gui.getBoundingClientRect().height || gui.offsetHeight || 300;
+                const currentWidth = gui.getBoundingClientRect().width || gui.offsetWidth || 100;
+                
+                if (currentHeight > 0) {
+                    const s = targetHeight / currentHeight;
+                    
+                    // Zoom is better for layout than scale
+                    gui.style.transform = 'none';
+                    gui.style.zoom = s;
+                    
+                    const parent = gui.parentElement;
+                    if (parent && parent.classList.contains('pedal-wrapper')) {
+                        parent.style.flex = '0 0 auto';
+                        parent.style.width = 'auto'; // Let zoom handle it
+                        parent.style.height = 'auto';
+                    }
+                }
+            }, 100);
+        }
+
+        async function setPluginBypass(inst, bypassed) {
+            try {
+                let info = null;
+                for (let i = 0; i < 5; i++) {
+                    info = await inst.audioNode.getParameterInfo();
+                    if (info && Object.keys(info).length > 0) break;
+                    await new Promise(r => setTimeout(r, 200));
+                }
+                if (!info) return;
+
+                const pIds = Object.keys(info);
+                const bypassParam = pIds.find(p => 
+                    p.toLowerCase().endsWith('/bypass') || 
+                    p.toLowerCase() === 'enabled' || 
+                    p.toLowerCase() === 'bypass'
+                );
+
+                if (bypassParam) {
+                    const isEnabledStyle = bypassParam.toLowerCase().includes('enabled');
+                    const val = isEnabledStyle ? (bypassed ? 0 : 1) : (bypassed ? 1 : 0);
+                    await inst.audioNode.setParameterValues({
+                        [bypassParam]: { id: bypassParam, value: val, normalized: false }
+                    });
+                }
+            } catch (e) { console.warn("Bypass error", e); }
+        }
+
+        function vuLoop() {
+            if (analyser) {
+                analyser.getByteTimeDomainData(dataArray);
+                let sum = 0;
+                for (let i = 0; i < dataArray.length; i++) {
+                    const v = (dataArray[i] - 128) / 128;
+                    sum += v * v;
+                }
+                const rms = Math.sqrt(sum / dataArray.length);
+                const volume = Math.min(100, rms * 500); 
+                vuMeter.style.height = volume + '%';
+            }
+            requestAnimationFrame(vuLoop);
+        }
+
+        outputSelect.onchange = async () => {
+            selectedSinkId = outputSelect.value;
+            if (!audioContext || typeof audioContext.setSinkId !== 'function') return;
+            try {
+                await audioContext.setSinkId(selectedSinkId);
+                status.textContent = "Output changed to: " + outputSelect.selectedOptions[0].text;
+            } catch (err) {
+                status.textContent = "Output switch error: " + err.message;
+            }
+        };
+
+        startBtn.onclick = async () => {
+            try {
+                startBtn.disabled = true;
+                if (!audioContext) {
+                    await initAudio();
+                }
+
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                }
+
+                if (currentSource) {
+                    currentSource.disconnect();
+                }
+
+                status.textContent = "Opening selected device...";
+                const deviceId = deviceSelect.value;
+                const constraints = {
+                    audio: { 
+                        deviceId: deviceId ? deviceId : undefined,
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false
+                    }
+                };
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+                // Firefox mirror workaround
+                const dummy = document.createElement('audio');
+                dummy.muted = true;
+                dummy.srcObject = stream;
+                dummy.play().catch(()=>{});
+
+                currentSource = audioContext.createMediaStreamSource(stream);
+                
+                // Route: Mic -> Analyser -> Tuner -> Gate -> Wah -> TS9 -> Phaser -> Chorus -> Amp -> Delay -> Reverb -> Destination
+                currentSource.connect(analyser);
+                analyser.connect(tunerInstance.audioNode);
+                tunerInstance.audioNode.connect(deathgateInstance.audioNode);
+                deathgateInstance.audioNode.connect(autowahInstance.audioNode);
+                autowahInstance.audioNode.connect(ts9Instance.audioNode);
+                phaserInstance.audioNode.connect(chorusInstance.audioNode);
+                chorusInstance.audioNode.connect(wamInstance.audioNode);
+                wamInstance.audioNode.connect(pingpongInstance.audioNode);
+                pingpongInstance.audioNode.connect(greyholeInstance.audioNode);
+                greyholeInstance.audioNode.connect(audioContext.destination);
+
+                status.textContent = "Streaming active. Device: " + deviceSelect.selectedOptions[0].text;
+                startBtn.textContent = "Restart Mic";
+                startBtn.classList.add('active');
+            } catch (err) {
+                console.error(err);
+                status.textContent = "Start error: " + err.message;
+            } finally {
+                startBtn.disabled = false;
+            }
+        };
+
+        // Initial call
+        updateDevices();
+
+    </script>
+</body>
+</html>
