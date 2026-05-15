@@ -884,6 +884,7 @@ outputDeviceSelect.addEventListener(
     // Output chain
     outputGainNode =
         audioContext.createGain();
+    window.outputGainNode = outputGainNode;
 
     outputAnalyser =
         audioContext.createAnalyser();
@@ -962,15 +963,12 @@ outputDeviceSelect.addEventListener(
     pingpongInst.audioNode.connect(greyholeInst.audioNode);
     
     // Final output to destination and VU meters
-    greyholeInst.audioNode.connect(audioContext.destination);
     greyholeInst.audioNode.connect(outputGainNode);
 
     firstPluginInstance = tunerInst;
     wamInstance = ampInst;
 
-    // ── Populate the plugin registry (preset manager uses this) ──
-    // To add a new plugin: instantiate it, wire it into the audio graph,
-    // then add one line here.  Preset save/restore will pick it up automatically.
+    // ... (rest of registry)
     _pluginRegistry.set('tuner',       tunerInst);
     _pluginRegistry.set('deathgate',   deathgateInst);
     _pluginRegistry.set('autoWah',     autoWahInst);
@@ -996,34 +994,28 @@ outputDeviceSelect.addEventListener(
 
     mount.innerHTML = '';
 
-    // ── Structure de présentation (identique à index2.html) ──────────────
     const mainCol = document.createElement('div');
     mainCol.className = 'main-column';
 
-    // Ligne du haut : Tuner (index 0) + Ampli (index 6) côte à côte
     const ampRow = document.createElement('div');
     ampRow.className = 'amp-row';
 
     const tunerWrap = document.createElement('div');
     tunerWrap.className = 'pedal-wrapper';
-    tunerWrap.appendChild(guis[0]);   // tuner
+    tunerWrap.appendChild(guis[0]);
     ampRow.appendChild(tunerWrap);
-
-    ampRow.appendChild(guis[6]);      // ampli (pas de pedal-wrapper pour qu'il garde sa taille naturelle)
+    ampRow.appendChild(guis[6]);
     mainCol.appendChild(ampRow);
 
-    // Ligne du bas : toutes les pédales (sauf tuner idx=0 et ampli idx=6)
     const effectsRow = document.createElement('div');
     effectsRow.className = 'effects-row';
-
-    const pedalIndices = [1, 2, 3, 4, 5, 7, 8]; // gate, wah, ts9, phaser, chorus, pingpong, greyhole
+    const pedalIndices = [1, 2, 3, 4, 5, 7, 8];
     pedalIndices.forEach(i => {
         const wrap = document.createElement('div');
         wrap.className = 'pedal-wrapper';
         wrap.appendChild(guis[i]);
         effectsRow.appendChild(wrap);
     });
-
     mainCol.appendChild(effectsRow);
     mount.appendChild(mainCol);
 
@@ -1043,51 +1035,37 @@ outputDeviceSelect.addEventListener(
         }, 100);
     }
 
+    // Initialise Backing Track Player
+    if (window.BackingTrackPlayer) {
+        window.btPlayer = new window.BackingTrackPlayer(audioContext, audioContext.destination);
+    }
+
     requestAnimationFrame(() => {
         const ampHeight = guis[6].getBoundingClientRect().height || 450;
-        scalePlugin(guis[0], ampHeight);                    // tuner à la hauteur de l'ampli
-        pedalIndices.forEach(i => scalePlugin(guis[i], 180)); // pédales à 180 px
+        scalePlugin(guis[0], ampHeight);
+        pedalIndices.forEach(i => scalePlugin(guis[i], 180));
     });
 
-
-    // Turn off effects (bypass) using standard WAM API AFTER GUIs are created
     setTimeout(async () => {
-        console.log('[Host] Initializing plugin states (Bypassing by default)...');
-
+        console.log('[Host] Initializing plugin states...');
         await setPluginBypass(tunerInst, true);
-        await setPluginBypass(deathgateInst, false); // Ensure gate is active but threshold low
-
-        try {
-            await deathgateInst.audioNode.setParameterValues({
-                "/deathgate/NoiseGate": { id: "/deathgate/NoiseGate", value: -120, normalized: false }
-            });
-        } catch (e) { }
-
+        await setPluginBypass(deathgateInst, false);
         await setPluginBypass(autoWahInst, true);
         await setPluginBypass(ts9Inst, true);
         await setPluginBypass(stonePhaserStereoInst, true);
         await setPluginBypass(chorusInst, true);
         await setPluginBypass(pingpongInst, true);
         await setPluginBypass(greyholeInst, true);
-
-        console.log('[Host] Initial plugin states set.');
     }, 1000);
 
-    // Start VU meter animation
     vuLoop();
-
-    // Unlock preset UI now that all plugins are ready
     enablePresetUI();
-
     setStatus('Ready — choose an audio source');
-    // Resume AudioContext on any click anywhere on the page
     document.addEventListener('click', () => { resumeAudio(); }, { once: false });
     document.addEventListener('keydown', () => { resumeAudio(); }, { once: false });
     player.onplay = () => { audioContext.resume(); };
 
     await enumerateDevices();
-
-    // Default to first audio file if available
     if (sourceSelect.options.length > 1) {
         sourceSelect.selectedIndex = 1;
         await switchSource();

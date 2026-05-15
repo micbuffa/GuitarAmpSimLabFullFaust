@@ -53,6 +53,17 @@ let style = `
     letter-spacing: 1px;
     margin-top: 2px;
     text-shadow: 0 1px 0px rgba(255,255,255,0.1);
+    transition: all 0.3s ease;
+}
+
+/* Bright glow when ON */
+#wrapper:not(.off-state) .title {
+    color: #fff;
+    text-shadow: 0 0 8px rgba(255,255,255,0.8), 0 0 15px rgba(255,255,255,0.4);
+}
+#wrapper:not(.off-state) .plugin-name {
+    color: #aaa;
+    text-shadow: 0 0 10px rgba(255,255,255,0.5);
 }
 
 .wrapper {
@@ -82,6 +93,17 @@ let style = `
 }
 .vague #pitch, .vague #note, .vague #detune_amt {
     color: #242;
+}
+
+/* Dimmed state when tuner is OFF */
+.off-state #detector {
+    background: #080a08;
+    opacity: 0.6;
+}
+.off-state #pitch, .off-state #note, .off-state #detune, .off-state #detune_amt, .off-state #pitch_unit {
+    color: #1a1a1a !important;
+    text-shadow: none !important;
+    opacity: 0.3;
 }
 
 .pitch {
@@ -153,26 +175,24 @@ let style = `
 
 let template = `
 <div class="bezel"></div>
-<div id="wc-tuner" class="wrapper">
-    <div class="title">PRO TUNER</div>
-    <div class="plugin-name">CHROMATIC</div>
+<div id="wrapper" class="wrapper">
+    <div class="title">Pro Tuner</div>
+    <div class="plugin-name">Chromatic</div>
     
     <div id="detector" class="vague">
         <canvas id="diode" width="170" height="20"></canvas>
-        <div class="pitch"><span id="pitch">---</span><span style="font-size:10px">Hz</span></div>
-        <div class="note"><span id="note">-</span></div>
+        <div class="pitch"><span id="pitch">--</span><span id="pitch_unit" style="font-size:10px; margin-left:2px; color:inherit;">Hz</span></div>
+        <div class="note" id="note">-</div>
         <canvas id="output" width="170" height="90"></canvas>
         
         <div id="detune">
-            <span id="flat">&#9664; FLAT</span>
-            <span id="detune_amt">---</span> CENTS
-            <span id="sharp">SHARP &#9654;</span>
+            <span id="flat">&lt;</span> <span id="detune_label">FLAT</span> <span id="detune_amt">--</span> <span id="sharp">&gt;</span> <span id="cents_label">CENTS</span>
         </div>
     </div>
     
     <div class="controls">
         <webaudio-switch id="switch1" class="switch" midilearn="true"
-            src="https://wasabi.i3s.unice.fr/WebAudioPluginBank/img/switch_1.png" width="32" height="20">
+            src="./assets/switch_1.png" width="32" height="20">
         </webaudio-switch>
         <div class="power-label">POWER</div>
     </div>
@@ -199,7 +219,26 @@ export default class TunerHTMLElement extends HTMLElement {
         //this._root.appendChild(tunertemp.content.cloneNode(true));
         this.state = new Object();
         this.isOn;
+        this.fixRelativePath();
+
         this.setSwitchListener();
+        this._root = this.shadowRoot;
+        this.wrapper = this._root.querySelector('#wrapper');
+        this.detectorElem = this._root.querySelector('#detector');
+
+        // Set initial visual state
+        if (!this.isOn) {
+            this.wrapper.classList.add('off-state');
+        }
+    }
+
+    fixRelativePath() {
+        const switchElem = this._root.querySelector("#switch1");
+        const imgPath = switchElem.getAttribute("src");
+        if (imgPath && imgPath.startsWith("./assets")) {
+            const base = new URL('.', import.meta.url);
+            switchElem.setAttribute("src", `${base}${imgPath}`);
+        }
     }
 
     get properties() {
@@ -235,7 +274,7 @@ export default class TunerHTMLElement extends HTMLElement {
         this.canvasElem = this.shadowRoot.getElementById("output");
         this.detectorElem = this.shadowRoot.getElementById("detector");
         this.DEBUGCANVAS = this.shadowRoot.getElementById("waveform");
-        
+
         // Removed freqslider logic
 
         this.wA = this.shadowRoot.getElementById("output").offsetWidth;
@@ -282,6 +321,7 @@ export default class TunerHTMLElement extends HTMLElement {
         const { plugin } = this;
         console.log(this);
         //by default, plugin is disabled
+        this.isOn = false;
         plugin.audioNode.setParamsValues({ enabled: 0 });
 
         this._root
@@ -293,18 +333,79 @@ export default class TunerHTMLElement extends HTMLElement {
                     // For starting the audio context in case it was stopped
                     this.plugin.audioNode.context.resume();
 
-                    this.plugin.audioNode.setParamValue('enabled', 1)
+                    this.plugin.audioNode.setParamValue('enabled', 1);
+                    this.isOn = true;
                     this.measurePitch();
+                    this.updateDecorativeState(true);
                     console.log("Tuner is on");
                 } else {
-                    this.plugin.audioNode.setParamValue('enabled', 0)
-
+                    this.plugin.audioNode.setParamValue('enabled', 0);
+                    this.isOn = false;
                     this.stopMeasuringPitch();
-
+                    this.updateDecorativeState(false);
                     console.log("Tuner is off");
                 }
 
             });
+    }
+
+    /** Light up / dim decorative LEDs on the diode bar when tuner is toggled */
+    updateDecorativeState(on) {
+        // Use the already-initialized canvas contexts from connectedCallback
+        if (!this.outputDCtx || !this.outputACtx) return;
+
+        // Toggle visual mode on the wrapper
+        if (on) {
+            this.wrapper.classList.remove('off-state');
+        } else {
+            this.wrapper.classList.add('off-state');
+        }
+
+        const ctx = this.outputDCtx;
+        ctx.clearRect(0, 0, 170, 20);
+        if (on) {
+            // Ambient power-on glow: side LEDs light up in amber
+            this.drawLED(ctx, 25,  10, 6, '#fa0', true);
+            this.drawLED(ctx, 85,  10, 6, '#0f0', false);
+            this.drawLED(ctx, 145, 10, 6, '#fa0', true);
+        } else {
+            // All LEDs dimmed
+            this.initdiiode(ctx);
+        }
+
+        // Redraw the meter background so fine ticks appear/disappear
+        this.outputACtx.clearRect(0, 0, this.wA, this.hA);
+        this.background(this.outputACtx);
+
+        if (on) {
+            // Full bright needle at rest (angle 0)
+            this.inittrait(this.outputACtx, 0);
+        } else {
+            // Dimmed needle at rest – draw manually with low opacity
+            const ctx = this.outputACtx;
+            ctx.save();
+            ctx.translate(this.wA / 2, this.hA - 10);
+            ctx.globalAlpha = 0.25;
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#555';
+            ctx.beginPath();
+            ctx.moveTo(-4, 0);
+            ctx.lineTo(4, 0);
+            ctx.lineTo(1.5, -78);
+            ctx.lineTo(-1.5, -78);
+            ctx.closePath();
+            ctx.fill();
+            // Pivot dimmed
+            ctx.globalAlpha = 0.3;
+            ctx.beginPath();
+            ctx.arc(0, 0, 6, 0, 2 * Math.PI);
+            ctx.fillStyle = '#333';
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#555';
+            ctx.stroke();
+            ctx.restore();
+        }
     }
 
     // name of the custom HTML element associated
@@ -372,6 +473,49 @@ export default class TunerHTMLElement extends HTMLElement {
         //le canvas de l'aiguille a été envelé pour le mettre dans le canvas principale
 
 
+        if (!this.isOn) {
+            // Force displays to dimmed state
+            this.detectorElem.className = "vague";
+            this.pitchElem.innerText = "--";
+            this.noteElem.innerText = "-";
+            this.detuneElem.className = "";
+            this.detuneAmount.innerText = "--";
+            
+            // Clear meter and draw dimmed needle/background
+            this.outputACtx.clearRect(0, 0, this.wA, this.hA);
+            this.background(this.outputACtx); // draws dimmed background since this.isOn is false
+            
+            // Draw dimmed needle manually (reuse logic from updateDecorativeState)
+            const ctx = this.outputACtx;
+            ctx.save();
+            ctx.translate(this.wA / 2, this.hA - 10);
+            ctx.globalAlpha = 0.25;
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#555';
+            ctx.beginPath();
+            ctx.moveTo(-4, 0);
+            ctx.lineTo(4, 0);
+            ctx.lineTo(1.5, -78);
+            ctx.lineTo(-1.5, -78);
+            ctx.closePath();
+            ctx.fill();
+            ctx.globalAlpha = 0.3;
+            ctx.beginPath();
+            ctx.arc(0, 0, 6, 0, 2 * Math.PI);
+            ctx.fillStyle = '#333';
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#555';
+            ctx.stroke();
+            ctx.restore();
+
+            // Clear decorative diode LEDs
+            this.initdiiode(this.outputDCtx);
+
+            this.rafID = requestAnimationFrame(this.updatePitch.bind(this));
+            return;
+        }
+
         this.plugin.audioNode.analyser.getFloatTimeDomainData(this.buf);
         let ac = this.autoCorrelate(this.buf, this.plugin.audioNode.context.sampleRate);
 
@@ -382,15 +526,15 @@ export default class TunerHTMLElement extends HTMLElement {
                 this.smoothedPitch = ac;
             } else {
                 // Stabilize: 0.1 for faster response, 0.05 for more stability
-                const alpha = 0.08; 
+                const alpha = 0.08;
                 this.smoothedPitch = this.smoothedPitch * (1 - alpha) + ac * alpha;
             }
         }
 
         let displayPitch = ac === -1 ? -1 : this.smoothedPitch;
-        let newAngle = this.angle_frequence(displayPitch); 
+        let newAngle = this.angle_frequence(displayPitch);
 
-        this.outputACtx.clearRect(0, 0, this.wA, this.hA); 
+        this.outputACtx.clearRect(0, 0, this.wA, this.hA);
 
         this.background(this.outputACtx);
         this.inittrait(this.outputACtx, newAngle);
@@ -405,7 +549,7 @@ export default class TunerHTMLElement extends HTMLElement {
             this.detuneAmount.innerText = "--";
         } else {
             this.detectorElem.className = "confident";
-            
+
             let pitch = this.smoothedPitch;
             this.pitchElem.innerText = Math.round(pitch);
             let note = this.noteFromPitch(pitch);
@@ -438,54 +582,119 @@ export default class TunerHTMLElement extends HTMLElement {
         ctx.save();
         ctx.translate(this.wA / 2, this.hA - 10);
 
-        var drawTick = (mesure, color, isMain) => {
-            let cnorm = this.map(mesure, -50, 0, 1, 0.1);
+        // ── Helper: compute angle from a cent offset (same logic as main ticks) ──
+        const tickAngle = (m, rightSide) => {
+            let cnorm = this.map(m, -50, 0, 1, 0.1);
             cnorm = this.mapLinearToLog(cnorm, -0.1, -1, 0.1, 1);
-            let angle = this.map(cnorm, -1, -0.1, -Math.PI / 4, 0);
+            return this.map(cnorm, -1, -0.1, rightSide ? Math.PI / 3 : -Math.PI / 3, 0);
+        };
+
+        // ── Power-on: radial backlight glow behind the whole arc ──
+        if (this.isOn) {
+            ctx.save();
+            const glowR = this.hA / 3 + 55;
+            const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, glowR);
+            grd.addColorStop(0,   'rgba(0, 255, 80, 0.09)');
+            grd.addColorStop(0.6, 'rgba(0, 200, 60, 0.05)');
+            grd.addColorStop(1,   'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = grd;
+            ctx.beginPath();
+            ctx.arc(0, 0, glowR, -Math.PI, 0);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // ── Tick drawing helpers ──
+        var drawTick = (m, color, isMain) => {
+            let angle = tickAngle(m, false);
             ctx.save();
             ctx.rotate(angle);
             ctx.strokeStyle = color;
             ctx.lineWidth = isMain ? 3 : 1.5;
+            if (this.isOn && isMain) {
+                ctx.shadowBlur = 6;
+                ctx.shadowColor = color;
+            }
             ctx.beginPath();
-            ctx.moveTo(0, -this.hA / 3 - 15);
-            ctx.lineTo(0, -this.hA / 3 - (isMain ? 30 : 22));
+            ctx.moveTo(0, -this.hA / 3 - 35);
+            ctx.lineTo(0, -this.hA / 3 - (isMain ? 50 : 42));
             ctx.stroke();
             ctx.restore();
         };
 
-        var drawTickRight = (mesure, color, isMain) => {
-            let cnorm = this.map(mesure, -50, 0, 1, 0.1);
-            cnorm = this.mapLinearToLog(cnorm, -0.1, -1, 0.1, 1);
-            let angle = this.map(cnorm, -1, -0.1, Math.PI / 4, 0);
+        var drawTickRight = (m, color, isMain) => {
+            let angle = tickAngle(m, true);
             ctx.save();
             ctx.rotate(angle);
             ctx.strokeStyle = color;
             ctx.lineWidth = isMain ? 3 : 1.5;
+            if (this.isOn && isMain) {
+                ctx.shadowBlur = 6;
+                ctx.shadowColor = color;
+            }
             ctx.beginPath();
-            ctx.moveTo(0, -this.hA / 3 - 15);
-            ctx.lineTo(0, -this.hA / 3 - (isMain ? 30 : 22));
+            ctx.moveTo(0, -this.hA / 3 - 35);
+            ctx.lineTo(0, -this.hA / 3 - (isMain ? 50 : 42));
             ctx.stroke();
             ctx.restore();
         };
 
-        // Center tick
-        ctx.strokeStyle = "#0f0";
+        // ── Fine ticks (every 1 cent) – LINEAR distribution to cover the full arc ──
+        if (this.isOn) {
+            for (let m = -49; m < 0; m++) {
+                if (m % 5 === 0) continue; // main ticks handle these
+                const color = m < -30 ? 'rgba(255,60,60,0.7)' : (m < -15 ? 'rgba(255,180,0,0.75)' : 'rgba(210,210,210,0.75)');
+                // Simple linear mapping: m in [-50, 0] → angle in [±π/3, 0]
+                const angleL = this.map(m, -50, 0, -Math.PI / 3, 0);   // left side
+                const angleR = this.map(m, -50, 0,  Math.PI / 3, 0);   // right side (mirrored)
+                const innerR = this.hA / 3 + 35;
+                const outerR = this.hA / 3 + (m % 2 === 0 ? 43 : 40); // alternating for density
+
+                ctx.save();
+                ctx.rotate(angleL);
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 0.9;
+                ctx.beginPath();
+                ctx.moveTo(0, -innerR);
+                ctx.lineTo(0, -outerR);
+                ctx.stroke();
+                ctx.restore();
+
+                ctx.save();
+                ctx.rotate(angleR);
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 0.9;
+                ctx.beginPath();
+                ctx.moveTo(0, -innerR);
+                ctx.lineTo(0, -outerR);
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        // ── Center tick (always visible, brighter when ON) ──
+        ctx.strokeStyle = this.isOn ? '#0f0' : '#0a0';
         ctx.lineWidth = 4;
+        if (this.isOn) { ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; }
         ctx.beginPath();
-        ctx.moveTo(0, -this.hA / 3 - 15);
-        ctx.lineTo(0, -this.hA / 3 - 35);
+        ctx.moveTo(0, -this.hA / 3 - 35);
+        ctx.lineTo(0, -this.hA / 3 - 52);
         ctx.stroke();
+        ctx.shadowBlur = 0;
 
-        for(let m = -50; m < 0; m += 5) {
-            let color = m < -30 ? "#f00" : (m < -15 ? "#fa0" : "#ddd");
+        // ── Main ticks (every 5 cents) – always visible ──
+        for (let m = -50; m < 0; m += 5) {
+            let color = m < -30 ? '#f00' : (m < -15 ? '#fa0' : '#ddd');
             drawTick(m, color, m % 10 === 0);
         }
-        for(let m = -50; m < 0; m += 5) {
-            let color = m < -30 ? "#f00" : (m < -15 ? "#fa0" : "#ddd");
+        for (let m = -50; m < 0; m += 5) {
+            let color = m < -30 ? '#f00' : (m < -15 ? '#fa0' : '#ddd');
             drawTickRight(m, color, m % 10 === 0);
         }
+
         ctx.restore();
     }
+
 
     // maps a value from [istart, istop] into [ostart, ostop]
     map(value, istart, istop, ostart, ostop) {
@@ -512,13 +721,13 @@ export default class TunerHTMLElement extends HTMLElement {
         // Needle Glow
         ctx.shadowBlur = 10;
         ctx.shadowColor = "#f00";
-        
+
         ctx.fillStyle = "#f33";
         ctx.beginPath();
-        ctx.moveTo(-3, 0);
-        ctx.lineTo(3, 0);
-        ctx.lineTo(1, -70);
-        ctx.lineTo(-1, -70);
+        ctx.moveTo(-4, 0);
+        ctx.lineTo(4, 0);
+        ctx.lineTo(1.5, -78);
+        ctx.lineTo(-1.5, -78);
         ctx.closePath();
         ctx.fill();
 
@@ -538,8 +747,8 @@ export default class TunerHTMLElement extends HTMLElement {
 
     drawLED(ctx, x, y, radius, color, glow) {
         ctx.beginPath();
-        let grad = ctx.createRadialGradient(x - radius/3, y - radius/3, radius/10, x, y, radius);
-        if(glow) {
+        let grad = ctx.createRadialGradient(x - radius / 3, y - radius / 3, radius / 10, x, y, radius);
+        if (glow) {
             grad.addColorStop(0, '#fff');
             grad.addColorStop(0.2, color);
             grad.addColorStop(1, '#222');
@@ -554,7 +763,7 @@ export default class TunerHTMLElement extends HTMLElement {
         ctx.fillStyle = grad;
         ctx.arc(x, y, radius, 0, 2 * Math.PI);
         ctx.fill();
-        
+
         ctx.lineWidth = 1;
         ctx.strokeStyle = "rgba(0,0,0,0.5)";
         ctx.stroke();
@@ -588,27 +797,27 @@ export default class TunerHTMLElement extends HTMLElement {
     Modifdio(ctx, ecart, side) {
         ctx.save();
         ctx.clearRect(0, 0, 170, 20);
-        
+
         let leftGlow = false;
         let leftColor = '#f00';
         let rightGlow = false;
         let rightColor = '#f00';
         let centerGlow = false;
-        
+
         if (side == "flat" && ecart <= -5) {
             leftGlow = true;
             if (ecart >= -15) leftColor = "#0f0";
             else if (ecart >= -35) leftColor = "#fa0";
             else leftColor = "#f00";
         }
-        
+
         if (side == "sharp" && ecart >= 5) {
             rightGlow = true;
             if (ecart <= 15) rightColor = "#0f0";
             else if (ecart <= 35) rightColor = "#fa0";
             else rightColor = "#f00";
         }
-        
+
         if (ecart <= 5 && ecart >= -5) {
             centerGlow = true;
         }
@@ -616,7 +825,7 @@ export default class TunerHTMLElement extends HTMLElement {
         this.drawLED(ctx, 25, 10, 6, leftColor, leftGlow);
         this.drawLED(ctx, 85, 10, 6, '#0f0', centerGlow);
         this.drawLED(ctx, 145, 10, 6, rightColor, rightGlow);
-        
+
         ctx.restore();
     }
 
@@ -706,7 +915,7 @@ export default class TunerHTMLElement extends HTMLElement {
             for (var j = 0; j < SIZE - i; j++)
                 c[i] = c[i] + buf[j] * buf[j + i];
         var d = 0; while (d < SIZE - 1 && c[d] > c[d + 1]) d++;
-        
+
         // Find global max to establish a threshold
         var globalMax = -1;
         for (var i = d; i < SIZE; i++) {
@@ -714,10 +923,10 @@ export default class TunerHTMLElement extends HTMLElement {
                 globalMax = c[i];
             }
         }
-        
+
         var maxval = -1, maxpos = -1;
         var threshold = globalMax * 0.9;
-        
+
         // Find the FIRST local peak that exceeds the threshold
         for (var i = d; i < SIZE - 1; i++) {
             if (c[i] >= threshold && c[i] > c[i + 1] && (i === 0 || c[i] > c[i - 1])) {
@@ -726,7 +935,7 @@ export default class TunerHTMLElement extends HTMLElement {
                 break;
             }
         }
-        
+
         if (maxpos === -1) {
             maxpos = d;
         }
