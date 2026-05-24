@@ -7,6 +7,7 @@
 
 // ---- component-level aliases -----------------------------------------------
 import("stdfaust.lib");
+import("IFCglobalPreset.dsp");
 
 ma = library("maths.lib");
 fi = library("filters.lib");
@@ -15,7 +16,7 @@ ba = library("basics.lib");
 
 declare name      "IFCtonestack";
 declare author    "Michel Buffa / based on Guitarix tonestacks.lib";
-declare version   "1.0";
+declare version   "1.1";
 declare license   "LGPL";
 
 
@@ -77,13 +78,15 @@ tonestack(C1,C2,C3,R1,R2,R3,R4,t,m,L) =
 
 // ---- per-model convenience wrappers ----------------------------------------
 // All wrappers: (treble, middle, bass) parameter order matches tonestack()
-mesa(T,M_,L)          = tonestack(250:pF,100:nF, 47:nF, 250:k, 250:k, 25:k, 100:k, T,M_,L);
-jcm800(T,M_,L)        = tonestack(470:pF, 22:nF, 22:nF, 220:k,   1:M, 22:k, 33:k,  T,M_,L);
+mesa_mark(T,M_,L)    = tonestack(250:pF,100:nF, 47:nF, 250:k, 250:k, 25:k, 100:k, T,M_,L);
+mesa_recto(T,M_,L)   = tonestack(250:pF,100:nF, 22:nF, 250:k, 250:k, 25:k,  47:k, T,M_,L);
+jcm800(T,M_,L)       = tonestack(470:pF, 22:nF, 22:nF, 220:k,   1:M, 22:k,  33:k, T,M_,L);
 ac30(T,M_,L)          = tonestack( 50:pF, 22:nF, 22:nF,   1:M,   1:M, 10:k, 100:k, T,M_,L);
 fender_deville(T,M_,L)= tonestack(250:pF,100:nF, 22:nF, 250:k, 250:k, 25:k, 130:k, T,M_,L);
+soldano(T,M_,L)       = tonestack(500:pF, 22:nF, 22:nF, 250:k,   1:M, 25:k,  47:k, T,M_,L);
 
 // ---- number of models (must match the list below) --------------------------
-NMODELS = 4;
+NMODELS = 6;
 
 // ---- UI controls -----------------------------------------------------------
 // vgroup "4 Tonestack"
@@ -92,9 +95,16 @@ NMODELS = 4;
 bass   = hgroup("4 Tonestack", hgroup("EQ", vslider("Bass[1][style:knob]",   0.5, 0, 1, 0.01)));
 middle = hgroup("4 Tonestack", hgroup("EQ", vslider("Middle[2][style:knob]", 0.3, 0, 1, 0.01)));
 treble = hgroup("4 Tonestack", hgroup("EQ", vslider("Treble[3][style:knob]", 0.75, 0, 1, 0.01)));
-model  = hgroup("4 Tonestack", hgroup("tonestack type",
-           nentry("Model[style:menu{'Mesa Boogie':0;'JCM800':1;'AC30':2;'Fender Hot Rod':3}]",
-                  3, 0, 3, 1))) : int;
+
+// Manual model selector (used in Lab mode)
+model_manual = hgroup("4 Tonestack", hgroup("tonestack type",
+           nentry("Model[style:menu{'Mesa Mark':0;'Mesa Rectifier':1;'JCM800':2;'AC30':3;'Fender Hot Rod':4;'Soldano':5}]",
+                  4, 0, 5, 1))) : int;
+
+// When ampModel > 0, force the tonestack model to match the amp preset
+//                         Lab          Mesa  Fender JCM  Soldano Vox
+model_forced = int(choose5ap(0,          1,    4,     2,   5,      3));
+model = select2(ampModel > 0, model_manual, model_forced);
 
 // ---- per-model makeup gain to compensate passive attenuation ----------------
 // Passive tonestacks inherently lose signal (typically -15 to -25 dB depending
@@ -102,18 +112,19 @@ model  = hgroup("4 Tonestack", hgroup("tonestack type",
 // back to approximately unity gain at "noon" settings (bass=0.5, mid=0.3, treble=0.75).
 // Values computed by compute_tonestack_gains.py using broadband RMS (signal.wav).
 // Ensures output perceived volume remains constant when bypassed.
-//                                Mesa     JCM800   AC30     Fender Deville
-makeupGainTable = 6.93, 2.13, 5.48, 6.10;
+//                    Mesa Mark  Mesa Recto  JCM800  AC30    Fender Deville  Soldano
+makeupGainTable = 6.93,     5.50,       2.13,   5.48,   6.10,           3.00;
 makeupGain = makeupGainTable : ba.selectn(NMODELS, model);
 
 // ---- model selector using ba.selectn ---------------------------------------
-// ba.selectn(N, k) : (sig0, sig1, ..., sigN-1) -> sig_k
 selectedModel =
     _ <:
-        mesa(treble, middle, bass),
+        mesa_mark(treble, middle, bass),
+        mesa_recto(treble, middle, bass),
         jcm800(treble, middle, bass),
         ac30(treble, middle, bass),
-        fender_deville(treble, middle, bass)
+        fender_deville(treble, middle, bass),
+        soldano(treble, middle, bass)
     : ba.selectn(NMODELS, model)
     : *(makeupGain);
 
@@ -121,4 +132,3 @@ selectedModel =
 selectedModel1 = hgroup("4 Tonestack", ba.bypass_fade(ma.SR/10, checkbox("bypass"), selectedModel));
 
 tonestack_stage = selectedModel1;
-
