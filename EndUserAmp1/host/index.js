@@ -31,14 +31,14 @@ const outputVuFill = document.getElementById('output-vu-fill');
 const outputVuPeak = document.getElementById('output-vu-peak');
 
 /* ── Preset DOM refs ────────────────────────────────────── */
-const presetSelect      = document.getElementById('preset-select');
-const btnSavePreset     = document.getElementById('btn-save-preset');
-const presetUpdateRow   = document.getElementById('preset-update-row');
-const btnUpdatePreset   = document.getElementById('btn-update-preset');
-const btnSaveasPreset   = document.getElementById('btn-saveas-preset');
-const btnDeletePreset   = document.getElementById('btn-delete-preset');
+const presetSelect = document.getElementById('preset-select');
+const btnSavePreset = document.getElementById('btn-save-preset');
+const presetUpdateRow = document.getElementById('preset-update-row');
+const btnUpdatePreset = document.getElementById('btn-update-preset');
+const btnSaveasPreset = document.getElementById('btn-saveas-preset');
+const btnDeletePreset = document.getElementById('btn-delete-preset');
 const activePresetBadge = document.getElementById('active-preset-badge');
-const activePresetName  = document.getElementById('active-preset-name');
+const activePresetName = document.getElementById('active-preset-name');
 
 /* ── State ──────────────────────────────────────────────── */
 let audioContext = null;
@@ -51,6 +51,7 @@ let mediaElSource = null;
 // Audio graph nodes
 let inputGainNode = null;
 let outputGainNode = null;
+let pluginPannerNode = null;
 let inputAnalyser = null;
 let outputAnalyser = null;
 
@@ -459,11 +460,11 @@ export async function loadPreset(name, isFactory) {
         state = _loadFromStorage(name);
     }
 
-    if (!state) { 
-        setStatus(`\u26A0\uFE0F Preset "${name}" not found`); 
-        return false; 
+    if (!state) {
+        setStatus(`\u26A0\uFE0F Preset "${name}" not found`);
+        return false;
     }
-    
+
     setStatus(`Loading preset "${name}"\u2026`);
     await _applyState(state);
     _setActivePreset(name, isFactory);
@@ -503,8 +504,8 @@ export function refreshPresetMenu() {
 /** Call once plugins are ready to unlock the preset UI */
 function enablePresetUI() {
     refreshPresetMenu();
-    presetSelect.disabled    = false;
-    btnSavePreset.disabled   = false;
+    presetSelect.disabled = false;
+    btnSavePreset.disabled = false;
     btnUpdatePreset.disabled = false;
     btnSaveasPreset.disabled = false;
     btnDeletePreset.disabled = false;
@@ -886,6 +887,11 @@ outputDeviceSelect.addEventListener(
         audioContext.createGain();
     window.outputGainNode = outputGainNode;
 
+    // Stereo panner for plugin chain (before mix)
+    pluginPannerNode = audioContext.createStereoPanner();
+    pluginPannerNode.pan.value = 0; // Center by default
+    window.pluginPannerNode = pluginPannerNode;
+
     outputAnalyser =
         audioContext.createAnalyser();
 
@@ -924,7 +930,8 @@ outputDeviceSelect.addEventListener(
         import('./plugins/StonePhaserStereo/index.js'),
         import('./plugins/WAMChorusMB/index.js'),
         import('../index.js'),
-        import('https://mainline.i3s.unice.fr/wam2/packages/faustPingPongDelay/plugin/index.js'),
+        //import('https://mainline.i3s.unice.fr/wam2/packages/faustPingPongDelay/plugin/index.js'),
+        import('./plugins/faustPingPongDelay/plugin/index.js'),
         import('./plugins/greyhole/index.js')
     ]);
 
@@ -961,23 +968,24 @@ outputDeviceSelect.addEventListener(
     chorusInst.audioNode.connect(ampInst.audioNode);
     ampInst.audioNode.connect(pingpongInst.audioNode);
     pingpongInst.audioNode.connect(greyholeInst.audioNode);
-    
-    // Final output to destination and VU meters
-    greyholeInst.audioNode.connect(outputGainNode);
+
+    // Final output: plugins → panner → gain → destination
+    greyholeInst.audioNode.connect(pluginPannerNode);
+    pluginPannerNode.connect(outputGainNode);
 
     firstPluginInstance = tunerInst;
     wamInstance = ampInst;
 
     // ... (rest of registry)
-    _pluginRegistry.set('tuner',       tunerInst);
-    _pluginRegistry.set('deathgate',   deathgateInst);
-    _pluginRegistry.set('autoWah',     autoWahInst);
-    _pluginRegistry.set('ts9',         ts9Inst);
+    _pluginRegistry.set('tuner', tunerInst);
+    _pluginRegistry.set('deathgate', deathgateInst);
+    _pluginRegistry.set('autoWah', autoWahInst);
+    _pluginRegistry.set('ts9', ts9Inst);
     _pluginRegistry.set('stonePhaser', stonePhaserStereoInst);
-    _pluginRegistry.set('chorus',      chorusInst);
-    _pluginRegistry.set('amp',         ampInst);
-    _pluginRegistry.set('pingpong',    pingpongInst);
-    _pluginRegistry.set('greyhole',    greyholeInst);
+    _pluginRegistry.set('chorus', chorusInst);
+    _pluginRegistry.set('amp', ampInst);
+    _pluginRegistry.set('pingpong', pingpongInst);
+    _pluginRegistry.set('greyhole', greyholeInst);
 
     // Create and mount GUIs
     const guis = await Promise.all([
@@ -1079,7 +1087,7 @@ export function getAmpInstance() { return ampInst; }
 // ── Robust bypass helper using WAM-standard methods with retry logic ──
 export async function setPluginBypass(inst, bypassed) {
     if (!inst || !inst.audioNode) return;
-    
+
     let info = null;
     for (let i = 0; i < 5; i++) {
         try {

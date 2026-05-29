@@ -3,13 +3,14 @@ export default class BackingTrackPlayer {
     constructor(audioContext, destNode) {
         this.ctx = audioContext;
         this.dest = destNode;
-        this.pluginGainNode = window.outputGainNode; // We'll try to get this from window
+        this.pluginGainNode = window.outputGainNode;
         
-        this.playlist = []; // Will be populated from JSON
+        this.playlist = [];
 
         this.loadPlaylist();
 
         this.currentBuffer = null;
+        this.originalBuffer = null; // Keep original for re-stretching
         this.source = null;
         
         // Backing track path
@@ -26,9 +27,28 @@ export default class BackingTrackPlayer {
         this.isLooping = true;
         this.isPlaying = false;
 
-        // Load AudioWorklet for Time Stretching
+        // Phase Vocoder AudioWorklet for real-time time stretching
+        this.phazeNode = null;
+        this.workletReady = false;
+        this.timeStretchEnabled = false;
         if (this.ctx.audioWorklet) {
-            this.ctx.audioWorklet.addModule('./phaze-processor.js').catch(e => console.error("Worklet error", e));
+            this.ctx.audioWorklet.addModule('./phaze-processor.js')
+                .then(() => {
+                    this.phazeNode = new AudioWorkletNode(this.ctx, 'phase-vocoder-processor', {
+                        numberOfInputs: 1,
+                        numberOfOutputs: 1,
+                        outputChannelCount: [2]
+                    });
+                    this.workletReady = true;
+                    console.log('[BackingTrack] Phase Vocoder worklet ready');
+                    // Enable slider once worklet is ready
+                    if (this.dom && this.dom.speed) {
+                        this.dom.speed.disabled = false;
+                        this.dom.speed.closest('.bt-param').classList.remove('disabled');
+                        this.dom.speed.closest('.bt-param').title = '';
+                    }
+                })
+                .catch(e => console.error('[BackingTrack] Worklet error', e));
         }
 
         this.initUI();
@@ -242,12 +262,20 @@ export default class BackingTrackPlayer {
                 <div class="bt-toolbar">
                     <button class="btn-bt-play" id="bt-play-btn">▶</button>
 
-                    <div class="bt-param disabled" title="Disabled - Pitch shifting currenty changes pitch">
+                    <div class="bt-param disabled" title="Loading worklet...">
                         <div class="bt-row">
-                            <label>TIME STRETCH (OFF)</label>
+                            <label>TIME STRETCH</label>
                             <span class="bt-param-val" id="bt-speed-txt">100%</span>
                         </div>
                         <input type="range" id="bt-speed-slider" min="0.5" max="1.5" step="0.01" value="1.0" disabled>
+                    </div>
+
+                    <div class="bt-param" style="min-width: 120px;">
+                        <div class="bt-row">
+                            <label>GUITAR PAN</label>
+                            <span class="bt-param-val" id="bt-pan-txt">C</span>
+                        </div>
+                        <input type="range" id="bt-pan-slider" min="-1" max="1" step="0.01" value="0">
                     </div>
 
                     <div class="bt-param" style="min-width: 180px;">
@@ -273,6 +301,8 @@ export default class BackingTrackPlayer {
             play: container.querySelector('#bt-play-btn'),
             speed: container.querySelector('#bt-speed-slider'),
             speedTxt: container.querySelector('#bt-speed-txt'),
+            pan: container.querySelector('#bt-pan-slider'),
+            panTxt: container.querySelector('#bt-pan-txt'),
             mix: container.querySelector('#bt-mix-slider'),
             mixTxt: container.querySelector('#bt-mix-txt'),
             loop: container.querySelector('#bt-loop-check'),
@@ -361,15 +391,46 @@ export default class BackingTrackPlayer {
 
     setupEvents() {
         this.dom.play.onclick = () => this.toggle();
+
+        // Time Stretch slider: changes playbackRate + phase vocoder pitch correction
         this.dom.speed.oninput = (e) => {
             this.playbackRate = parseFloat(e.target.value);
             this.dom.speedTxt.textContent = `${Math.round(this.playbackRate * 100)}%`;
+            
+            const needsStretching = Math.abs(this.playbackRate - 1.0) > 0.01;
+            this.timeStretchEnabled = needsStretching;
+
             if (this.source) {
-                // In the future, this would drive the Worklet. 
-                // For now, it's a target for the algorithm implementation.
-                this.source.playbackRate.value = this.playbackRate; 
+                this.source.playbackRate.value = this.playbackRate;
+            }
+            // Update phase vocoder pitch correction: compensate for speed change
+            if (this.phazeNode && this.workletReady) {
+                const pitchCorrection = needsStretching ? (1.0 / this.playbackRate) : 1.0;
+                this.phazeNode.parameters.get('pitchFactor').setValueAtTime(pitchCorrection, this.ctx.currentTime);
+            }
+
+            // Reconnect audio graph if playing
+            if (this.isPlaying) {
+                this.play();
             }
         };
+
+        // Guitar Pan slider: controls stereo panning of plugin chain
+        this.dom.pan.oninput = (e) => {
+            const panValue = parseFloat(e.target.value);
+            if (window.pluginPannerNode) {
+                window.pluginPannerNode.pan.setValueAtTime(panValue, this.ctx.currentTime);
+            }
+            // Display: L100...C...R100
+            if (Math.abs(panValue) < 0.01) {
+                this.dom.panTxt.textContent = 'C';
+            } else if (panValue < 0) {
+                this.dom.panTxt.textContent = `L${Math.round(Math.abs(panValue) * 100)}`;
+            } else {
+                this.dom.panTxt.textContent = `R${Math.round(panValue * 100)}`;
+            }
+        };
+
         this.dom.mix.oninput = (e) => {
             this.updateMix(parseFloat(e.target.value));
         };
@@ -561,7 +622,14 @@ export default class BackingTrackPlayer {
 
         this.source = this.ctx.createBufferSource();
         this.source.buffer = this.currentBuffer;
-        this.source.connect(this.btGainNode);
+
+        // Route through Phase Vocoder worklet if time stretching is active
+        if (this.timeStretchEnabled && this.phazeNode && this.workletReady) {
+            this.source.connect(this.phazeNode);
+            this.phazeNode.connect(this.btGainNode);
+        } else {
+            this.source.connect(this.btGainNode);
+        }
         
         this.isLooping = this.dom.loop.checked;
         this.source.loop = this.isLooping;
@@ -587,8 +655,15 @@ export default class BackingTrackPlayer {
 
     stop() {
         if (this.source) { 
-            try { this.source.stop(); } catch(e){} 
+            try { 
+                this.source.disconnect();
+                this.source.stop(); 
+            } catch(e){} 
             this.source = null; 
+        }
+        // Disconnect phazeNode output (will be reconnected on next play if needed)
+        if (this.phazeNode) {
+            try { this.phazeNode.disconnect(); } catch(e) {}
         }
         if (this.animFrame) cancelAnimationFrame(this.animFrame);
         

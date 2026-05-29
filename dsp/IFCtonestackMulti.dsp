@@ -7,7 +7,6 @@
 
 // ---- component-level aliases -----------------------------------------------
 import("stdfaust.lib");
-import("IFCglobalPreset.dsp");
 
 ma = library("maths.lib");
 fi = library("filters.lib");
@@ -96,15 +95,10 @@ bass   = hgroup("4 Tonestack", hgroup("EQ", vslider("Bass[1][style:knob]",   0.5
 middle = hgroup("4 Tonestack", hgroup("EQ", vslider("Middle[2][style:knob]", 0.3, 0, 1, 0.01)));
 treble = hgroup("4 Tonestack", hgroup("EQ", vslider("Treble[3][style:knob]", 0.75, 0, 1, 0.01)));
 
-// Manual model selector (used in Lab mode)
-model_manual = hgroup("4 Tonestack", hgroup("tonestack type",
+// Model selector — always manual (user picks the tonestack to match their amp)
+model  = hgroup("4 Tonestack", hgroup("tonestack type",
            nentry("Model[style:menu{'Mesa Mark':0;'Mesa Rectifier':1;'JCM800':2;'AC30':3;'Fender Hot Rod':4;'Soldano':5}]",
-                  4, 0, 5, 1))) : int;
-
-// When ampModel > 0, force the tonestack model to match the amp preset
-//                         Lab          Mesa  Fender JCM  Soldano Vox
-model_forced = int(choose5ap(0,          1,    4,     2,   5,      3));
-model = select2(ampModel > 0, model_manual, model_forced);
+                  1, 0, 5, 1))) : int;
 
 // ---- per-model makeup gain to compensate passive attenuation ----------------
 // Passive tonestacks inherently lose signal (typically -15 to -25 dB depending

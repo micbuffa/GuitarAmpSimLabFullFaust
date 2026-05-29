@@ -1,10 +1,9 @@
 import("stdfaust.lib");
-import("IFCglobalPreset.dsp");
 wa = library("webaudio.lib");
 
 declare name      "IFCpowerAmp";
 declare author    "Michel Buffa and Jerome Lebrun";
-declare version   "1.1";
+declare version   "1.0";
 declare license   "LGPL";
 
 // This is a power amp emulation that uses a negative feedback loop.
@@ -15,18 +14,13 @@ declare license   "LGPL";
 // Adapted for PowerAmp simulation (addition of presence filter, param adaptation, 
 // small changes...)
 
-// v1.1: parameters are now driven by ampModel (global preset). In Lab mode,
-// the knobs work as before. In preset mode, calibrated values per amp model.
+// All knobs are ALWAYS user-controllable (like a real amp's front panel).
+// Master Volume, Presence, Drive, Saturation, Curve, Negative Feedback.
 
-// Distortion parameters — driven by ampModel
-pdrive_knob = hslider("Drive gain[style:knob]", 4.0, -10.0, 10.0, 0.001) : si.smooth(0.995);
-psat_knob   = hslider("Saturation dry wet[style:knob]", 1.0, 0.0, 1.0, 0.001) : si.smooth(0.995);
-pcurve_knob = hslider("Curve k[style:knob]", 1.0, 0.1, 4.0, 0.001) : si.smooth(0.995);
-
-//                        Lab           Mesa  Fender JCM   Soldano Vox
-pdrive = choose5ap(pdrive_knob,         5.0,  2.5,   4.0,  5.5,    3.0) : si.smooth(0.995);
-psat   = choose5ap(psat_knob,           0.85, 0.6,   0.8,  0.9,    0.95) : si.smooth(0.995);
-pcurve = choose5ap(pcurve_knob,         1.5,  0.8,   1.2,  1.4,    1.8) : si.smooth(0.995);
+// Distortion parameters
+pdrive = hslider("Drive gain[style:knob]", 4.0, -10.0, 10.0, 0.001) : si.smooth(0.995);
+psat = hslider("Saturation dry wet[style:knob]", 1.0, 0.0, 1.0, 0.001) : si.smooth(0.995);
+pcurve = hslider("Curve k[style:knob]", 1.0, 0.1, 4.0, 0.001) : si.smooth(0.995);
 
 // Output parameters
 plevel = hslider("Level[style:knob]", -3, -24, 24, 1) : ba.db2linear : si.smooth(0.995);
@@ -94,23 +88,12 @@ with {
 };
 
 
-// Feedback circuit with presence — driven by ampModel
-p1gain_knob = hslider("Presence[name:p1Gain][style:knob]", 0, -15, 15, 0.1);
-gainNFL_knob = hslider("Negative gain[name:Level][style:knob]", -0.4, -0.8, 1, 0.01) : si.smoo;
-
-//                        Lab            Mesa  Fender JCM   Soldano Vox
-p1gain  = choose5ap(p1gain_knob,         3.0,  0.0,   2.0,  4.0,    -2.0) : si.smoo;
-gainNFL = choose5ap(gainNFL_knob,        -0.35, -0.5, -0.4, -0.3,   -0.2) : si.smoo;
-
 feedbackCircuit = presence:*(gainNFL) 
 with {
+	p1gain = hslider("Presence[name:p1Gain][style:knob]", 0, -15, 15, 0.1);
     presence = wa.peaking2(2000, p1gain, 1, 1) : wa.peaking2(4000, p1gain, 1, 1);
+	gainNFL = hslider("Negative gain[name:Level][style:knob]", -0.4, -0.8, 1, 0.01) : si.smoo;
 };
-
-// Master Volume — driven by ampModel
-masterVolume_knob = hslider("Master Volume[name:MV][style:knob]", 2.3, 0, 4, 0.1) : si.smoo;
-//                            Lab               Mesa  Fender JCM  Soldano Vox
-masterVolume = choose5ap(masterVolume_knob,      2.5,  2.0,   2.3, 2.5,    1.8) : si.smoo;
 
 // Our main processing block.
 main = *(masterVolume) :(+ : waveshaper : fi.dcblocker) ~ feedbackCircuit : gain with {
@@ -119,6 +102,7 @@ main = *(masterVolume) :(+ : waveshaper : fi.dcblocker) ~ feedbackCircuit : gain
 	// occurs from the prefilter and modulation step. Then we apply the output
 	// level parameter.
 	gain = *(4.0) : *(plevel);
+	masterVolume = hslider("Master Volume[name:MV][style:knob]", 2.3, 0, 4, 0.1) : si.smoo;
 };
 
 // Export reusable mono and stereo variants for composition in larger patches.
